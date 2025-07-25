@@ -1,5 +1,5 @@
 # HAG (HybridRAG)
-
+**查看其他语言: [中文](README.md), [English](README_EN.md).**
 > 🚀 基于双数据库的智能混合检索系统，融合图谱与向量的优势
 
 ## 📊 对比分析

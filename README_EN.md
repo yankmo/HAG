@@ -1,4 +1,5 @@
 # HAG (HybridRAG)
+**Read this in other languages: [中文](README.md), [English](README_EN.md).**
 
 > 🚀 Intelligent Hybrid Retrieval System Based on Dual Databases, Combining the Advantages of Knowledge Graphs and Vector Search
 
