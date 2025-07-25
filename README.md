@@ -72,6 +72,11 @@ streamlit run app_simple.py
 
 欢迎提交 Issue 和 Pull Request！
 
+### 📧 联系方式
+- **邮箱**: yankmo@qq.com | yankmooo@gmail.com
+- **问题反馈**: 欢迎通过 Issue 报告 Bug 或提出功能建议
+- **代码贡献**: 随时欢迎提交 Pull Request！
+
 ## 📄 许可证
 
 MIT License

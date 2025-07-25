@@ -105,6 +105,11 @@ OLLAMA_BASE_URL=http://localhost:11434
 
 We welcome Issues and Pull Requests!
 
+### 📧 Contact
+- **Email**: yankmo@qq.com | yankmooo@gmail.com
+- **Issues**: Feel free to open an issue for bug reports or feature requests
+- **Pull Requests**: Contributions are always welcome!
+
 ## 📄 License
 
 MIT License
