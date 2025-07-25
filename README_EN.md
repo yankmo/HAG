@@ -5,13 +5,13 @@
 
 ## 📊 Comparison Analysis
 
-| Feature | Traditional RAG | HAG |
-|---------|----------------|-----|
-| Retrieval Method | Single Vector Retrieval | Graph + Vector Hybrid Retrieval |
-| Similarity Algorithm | Single Algorithm | Euclidean Distance + Cosine Similarity |
-| Knowledge Acquisition | Document Fragments | Entities + Relations + Nodes + Documents |
-| Result Fusion | None | Intelligent Deduplication & Ranking |
-| Retrieval Transparency | Black Box | Complete Process Visualization |
+| Feature | HAG |
+|---------|----------------|
+| Retrieval Method | Graph + Vector Hybrid Retrieval |
+| Similarity Algorithm | Euclidean Distance + Cosine Similarity |
+| Knowledge Acquisition | Entities + Relations + Nodes + Documents |
+| Result Fusion | Intelligent Deduplication & Ranking |
+| Retrieval Transparency | Complete Process Visualization |
 
 ## ✨ Core Features
 
