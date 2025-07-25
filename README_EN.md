@@ -3,6 +3,8 @@
 
 > 🚀 Intelligent Hybrid Retrieval System Based on Dual Databases, Combining the Advantages of Knowledge Graphs and Vector Search
 
+[![GitHub Stars](https://img.shields.io/github/stars/yankmo/HAG?style=social)](https://github.com/yankmo/HAG) [![GitHub Forks](https://img.shields.io/github/forks/yankmo/HAG?style=social)](https://github.com/yankmo/HAG) [![GitHub License](https://img.shields.io/github/license/yankmo/HAG)](https://github.com/yankmo/HAG/blob/main/LICENSE) [![CSDN Blog](https://img.shields.io/badge/CSDN-Blog-blue?style=social)](https://blog.csdn.net/YankMo)
+
 ## 📊 Comparison Analysis
 
 | Feature | HAG |

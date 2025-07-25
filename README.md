@@ -1,7 +1,8 @@
 # HAG (HybridRAG)
-**查看其他语言: [中文](README.md), [English](README_EN.md).**
+**[中文](README.md)| [English](README_EN.md).**
 > 🚀 基于双数据库的智能混合检索系统，融合图谱与向量的优势
 
+[![GitHub Stars](https://img.shields.io/github/stars/yankmo/HAG?style=social)](https://github.com/yankmo/HAG) [![GitHub Forks](https://img.shields.io/github/forks/yankmo/HAG?style=social)](https://github.com/yankmo/HAG) [![GitHub License](https://img.shields.io/github/license/yankmo/HAG)](https://github.com/yankmo/HAG/blob/main/LICENSE) [![CSDN Blog](https://img.shields.io/badge/CSDN-Blog-blue?style=social)](https://blog.csdn.net/YankMo)
 ## 📊 特性分析
 
 | 特性 | HAG |
