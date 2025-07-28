@@ -1,0 +1,30 @@
+# HAG项目配置文件
+# 所有服务的配置都在这里统一管理
+
+# Neo4j图数据库配置
+neo4j:
+  uri: "bolt://localhost:7687"
+  username: "neo4j"
+  password: "hrx274700"
+  database: "neo4j"
+
+# Ollama大语言模型服务配置
+ollama:
+  base_url: "http://localhost:11434"
+  default_model: "gemma3:4b"
+  embedding_model: "bge-m3:latest"
+  timeout: 30
+
+# Weaviate向量数据库配置
+weaviate:
+  url: "http://localhost:8080"
+  host: "localhost"
+  port: 8080
+
+# 应用程序配置
+app:
+  debug: false
+  log_level: "INFO"
+  max_chunk_size: 1000
+  chunk_overlap: 200
+  max_results: 10

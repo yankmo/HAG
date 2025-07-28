@@ -2,8 +2,12 @@ import ollama
 from ollama import Message
 import numpy as np
 
+# 导入配置管理器
+from config import get_config
+
 # 创建带超时的 ollama 客户端
-ollama_client = ollama.Client(host='http://localhost:11434', timeout=30)
+config = get_config()
+ollama_client = ollama.Client(host=config.ollama.base_url, timeout=config.ollama.timeout)
 
 class Kb:
     def __init__(self, filepath):
@@ -28,9 +32,10 @@ class Kb:
     @staticmethod
     def encode(texts):
         # 使用ollama的embeddings模型获取向量并储存
+        config = get_config()
         embeds = []
         for text in texts:
-            response = ollama_client.embeddings(model='nomic-embed-text', prompt=text)
+            response = ollama_client.embeddings(model=config.ollama.embedding_model, prompt=text)
             embeds.append(response['embedding'])
         return np.array(embeds)
 

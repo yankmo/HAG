@@ -48,6 +48,40 @@
 pip install -r requirements.txt
 ```
 
+### 配置系统
+项目采用统一的配置管理系统，支持多种配置方式：
+
+#### 1. 配置文件 (推荐)
+编辑 `config/config.yaml`:
+```yaml
+neo4j:
+  uri: "bolt://localhost:7687"
+  username: "neo4j"
+  password: "your_password"
+
+ollama:
+  base_url: "http://localhost:11434"
+  default_model: "gemma3:4b"
+  embedding_model: "bge-m3:latest"
+
+weaviate:
+  url: "http://localhost:8080"
+  host: "localhost"
+  port: 8080
+```
+
+#### 2. 环境变量
+复制 `.env.example` 为 `.env` 并修改配置：
+```bash
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=your_password
+OLLAMA_BASE_URL=http://localhost:11434
+WEAVIATE_URL=http://localhost:8080
+```
+
+详细配置说明请参考 [配置迁移指南](docs/配置迁移指南.md)。
+
 ### 启动服务
 ```bash
 # 启动 Weaviate

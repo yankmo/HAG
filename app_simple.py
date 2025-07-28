@@ -16,9 +16,22 @@ logger = logging.getLogger(__name__)
 # 添加项目根目录到路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+# 导入配置管理器
+from config import get_config
+from src.services.llm_service import OllamaLLMService as SimpleOllamaLLM
+from src.services.embedding_service import OllamaEmbeddingService as OllamaEmbeddingClient
+from src.services.retrieval_service import RetrievalService
+
 # 尝试导入真实的RAG系统组件
-REAL_RAG_AVAILABLE = False
-ModularRAGSystem = None
+REAL_RAG_AVAILABLE = True
+try:
+    # 使用新的RetrievalService
+    if 'import_logged' not in st.session_state:
+        logger.info("新的检索服务组件导入成功")
+        st.session_state.import_logged = True
+except ImportError as e:
+    REAL_RAG_AVAILABLE = False
+    logger.warning(f"检索服务组件导入失败: {e}")
 
 # 尝试导入简化的RAG组件（避免Weaviate依赖）
 try:
@@ -26,36 +39,22 @@ try:
     from src.knowledge.intent_recognition_neo4j import KnowledgeGraphBuilder
     from py2neo import Graph
     SIMPLE_RAG_AVAILABLE = True
-    logger.info("简化RAG系统组件导入成功")
+    if 'simple_import_logged' not in st.session_state:
+        logger.info("简化RAG系统组件导入成功")
+        st.session_state.simple_import_logged = True
 except ImportError as e:
     SIMPLE_RAG_AVAILABLE = False
     logger.warning(f"简化RAG系统组件导入失败: {e}")
 
-# 暂时禁用完整RAG系统导入，避免protobuf兼容性问题
-# try:
-#     # 先尝试导入基础组件
-#     from src.knowledge.modular_rag_system import ModularRAGSystem
-#     REAL_RAG_AVAILABLE = True
-#     logger.info("ModularRAGSystem导入成功")
-#     
-#     # 尝试导入main.py中的组件（可选）
-#     try:
-#         from main import RAGRetriever, OllamaLLM, create_rag_chain, format_retrieval_results
-#         logger.info("main.py组件导入成功")
-#     except ImportError as e:
-#         logger.warning(f"main.py组件导入失败，将使用基础功能: {e}")
-#         
-# except ImportError as e:
-#     REAL_RAG_AVAILABLE = False
-#     logger.warning(f"真实RAG系统组件未找到，将使用模拟组件: {e}")
-# except Exception as e:
-#     REAL_RAG_AVAILABLE = False
-#     logger.warning(f"导入RAG系统时出现错误，将使用模拟组件: {e}")
-
-if SIMPLE_RAG_AVAILABLE:
+if REAL_RAG_AVAILABLE and 'system_type_logged' not in st.session_state:
+    logger.info("使用新的检索服务进行演示")
+    st.session_state.system_type_logged = True
+elif SIMPLE_RAG_AVAILABLE and 'system_type_logged' not in st.session_state:
     logger.info("使用简化RAG系统进行演示")
-else:
+    st.session_state.system_type_logged = True
+elif 'system_type_logged' not in st.session_state:
     logger.info("使用模拟RAG系统进行演示")
+    st.session_state.system_type_logged = True
 
 # 页面配置
 st.set_page_config(
@@ -114,50 +113,167 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-class SimpleOllamaLLM:
-    """简化的Ollama LLM客户端"""
+class NewRAGSystem:
+    """使用新的RetrievalService的RAG系统"""
     
-    def __init__(self, model: str = "gemma3:4b", base_url: str = "http://localhost:11434"):
-        self.model = model
-        self.base_url = base_url
-        self.api_url = f"{base_url}/api/generate"
-    
-    def check_connection(self) -> bool:
-        """检查Ollama连接状态"""
+    def __init__(self):
+        """初始化新的RAG系统"""
+        self.retrieval_service = None
+        self.initialized = False
+        
         try:
-            response = requests.get(f"{self.base_url}/api/tags", timeout=5)
-            return response.status_code == 200
-        except:
-            return False
-    
-    def generate_response(self, prompt: str, temperature: float = 0.7, max_tokens: int = 1000) -> str:
-        """生成回答"""
-        try:
-            payload = {
-                "model": self.model,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": temperature,
-                    "top_p": 0.9,
-                    "max_tokens": max_tokens
-                }
-            }
-            
-            response = requests.post(
-                self.api_url,
-                json=payload,
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                return result.get('response', '抱歉，无法生成回答。')
+            if REAL_RAG_AVAILABLE:
+                # 初始化RetrievalService
+                self.retrieval_service = RetrievalService()
+                self.initialized = True
+                logger.info("新的RAG系统初始化成功")
             else:
-                return f"请求失败，状态码: {response.status_code}"
-                
+                logger.warning("新的RAG系统不可用")
         except Exception as e:
-            return f"生成回答时出错: {str(e)}"
+            logger.error(f"新的RAG系统初始化失败: {e}")
+            self.initialized = False
+    
+    def get_stats(self):
+        """获取系统统计信息"""
+        if self.initialized and self.retrieval_service:
+            try:
+                # 获取统计信息
+                stats = self.retrieval_service.get_stats()
+                return {
+                    "neo4j_nodes": stats.get("neo4j_nodes", 0),
+                    "neo4j_relationships": stats.get("neo4j_relationships", 0),
+                    "weaviate_entities": stats.get("weaviate_entities", 0),
+                    "weaviate_relations": stats.get("weaviate_relations", 0),
+                    "status": "新版本"
+                }
+            except Exception as e:
+                logger.error(f"获取统计信息失败: {e}")
+                return {
+                    "neo4j_nodes": 0,
+                    "neo4j_relationships": 0,
+                    "weaviate_entities": 0,
+                    "weaviate_relations": 0,
+                    "error": str(e)
+                }
+        return {
+            "neo4j_nodes": 0,
+            "neo4j_relationships": 0,
+            "weaviate_entities": 0,
+            "weaviate_relations": 0,
+            "status": "未初始化"
+        }
+    
+    def search_knowledge(self, query, **kwargs):
+        """搜索知识"""
+        if self.initialized and self.retrieval_service:
+            try:
+                import time
+                start_time = time.time()
+                
+                # 使用新的检索服务进行搜索
+                hybrid_result = self.retrieval_service.search_hybrid(query, limit=5)
+                
+                retrieval_time = time.time() - start_time
+                logger.info(f"新检索服务完成，耗时 {retrieval_time:.2f}s")
+                
+                # 转换结果格式以兼容现有的显示代码
+                entities = []
+                relations = []
+                
+                # 处理混合检索结果
+                for result in hybrid_result.hybrid_results:
+                    # 计算相似度（从SearchResult对象获取）
+                    similarity = result.score if hasattr(result, 'score') else None
+                    distance = result.distance if hasattr(result, 'distance') else None
+                    
+                    # 从metadata获取信息
+                    metadata = result.metadata if hasattr(result, 'metadata') else {}
+                    result_type = metadata.get('type', '')
+                    name = metadata.get('name', 'N/A')
+                    description = metadata.get('description', 'N/A')
+                    
+                    # 记录调试信息
+                    logger.debug(f"处理结果: type={result_type}, name={name}, similarity={similarity}")
+                    
+                    # 检查是否为关系类型
+                    if (result_type == 'relation' and 
+                        metadata.get('start_entity') and 
+                        metadata.get('end_entity')):
+                        # 这是真正的关系
+                        relation = {
+                            'description': f"{metadata.get('start_entity', 'N/A')} → {metadata.get('relation_type', 'N/A')} → {metadata.get('end_entity', 'N/A')}",
+                            'type': metadata.get('relation_type', 'N/A'),
+                            'start_entity': metadata.get('start_entity', 'N/A'),
+                            'end_entity': metadata.get('end_entity', 'N/A'),
+                            'similarity': f"{similarity:.3f}" if similarity is not None else "N/A"
+                        }
+                        relations.append(relation)
+                    else:
+                        # 默认作为实体处理（包括所有其他类型）
+                        entity = {
+                            'name': name,
+                            'type': result_type if result_type else 'entity',
+                            'description': description,
+                            'similarity': f"{similarity:.3f}" if similarity is not None else "N/A",
+                            'distance': distance,
+                            'source_text': result.content if hasattr(result, 'content') else '',
+                            'metadata': metadata
+                        }
+                        entities.append(entity)
+                
+                return {
+                    "query": query,
+                    "search_results": {
+                        "vector_search": {
+                            "entities": entities,
+                            "relations": relations  # 只包含真正的关系
+                        },
+                        "graph_search": {
+                            "nodes": [],
+                            "relationships": [],
+                            "total_nodes": 0,
+                            "total_relationships": 0
+                        },
+                        "hybrid_search": {
+                            "search_stats": {
+                                "vector_entities": len(entities),
+                                "vector_relations": len(relations),
+                                "graph_nodes": 0,
+                                "graph_relationships": 0
+                            }
+                        }
+                    },
+                    "retrieval_time": retrieval_time
+                }
+                
+            except Exception as e:
+                logger.error(f"知识搜索失败: {e}")
+                return {
+                    "error": str(e),
+                    "query": query,
+                    "search_results": {}
+                }
+        else:
+            logger.error("新RAG系统未初始化")
+            return {
+                "error": "新RAG系统未初始化",
+                "query": query,
+                "search_results": {}
+            }
+    
+    def generate_answer(self, query, search_results=None):
+        """生成答案"""
+        if self.initialized and self.retrieval_service:
+            try:
+                # 使用检索服务生成答案
+                answer = self.retrieval_service.generate_answer(query, search_results)
+                return answer
+            except Exception as e:
+                logger.error(f"生成答案失败: {e}")
+                return f"生成答案时出现错误: {e}"
+        else:
+            return "新RAG系统未初始化，无法生成答案"
+
 
 class SimpleRAGSystem:
     """简化的RAG系统，仅使用Neo4j知识图谱"""
@@ -171,15 +287,18 @@ class SimpleRAGSystem:
         
         try:
             if SIMPLE_RAG_AVAILABLE:
+                # 获取配置
+                config = get_config()
+                
                 # 初始化知识图谱构建器
                 self.kg_builder = KnowledgeGraphBuilder()
                 # 初始化Neo4j连接
-                self.neo4j_graph = Graph("bolt://localhost:7687", auth=("neo4j", "hrx274700"))
+                self.neo4j_graph = Graph(config.neo4j.uri, auth=(config.neo4j.username, config.neo4j.password))
                 
                 # 尝试初始化向量处理器（可选）
                 try:
-                    from src.knowledge.vector_storage import OllamaEmbeddingClient, WeaviateVectorStore, VectorKnowledgeProcessor
-                    embedding_client = OllamaEmbeddingClient(model="bge-m3:latest")
+                    from src.knowledge.vector_storage import WeaviateVectorStore, VectorKnowledgeProcessor
+                    embedding_client = OllamaEmbeddingClient()
                     vector_store = WeaviateVectorStore()
                     self.vector_processor = VectorKnowledgeProcessor(embedding_client, vector_store)
                     logger.info("向量处理器初始化成功")
@@ -885,9 +1004,24 @@ def initialize_llm():
 @st.cache_resource
 def initialize_retriever():
     """初始化检索器（使用缓存）"""
-    logger.info(f"开始初始化检索器，SIMPLE_RAG_AVAILABLE={SIMPLE_RAG_AVAILABLE}")
+    logger.info(f"开始初始化检索器，REAL_RAG_AVAILABLE={REAL_RAG_AVAILABLE}")
     
-    if SIMPLE_RAG_AVAILABLE:
+    if REAL_RAG_AVAILABLE:
+        logger.info("尝试初始化新RAG系统")
+        rag_system = NewRAGSystem()
+        if rag_system.initialized:
+            logger.info("新RAG系统初始化成功")
+            return rag_system
+        else:
+            logger.warning("新RAG系统初始化失败，尝试简化RAG系统")
+            if SIMPLE_RAG_AVAILABLE:
+                rag_system = SimpleRAGSystem()
+                if rag_system.initialized:
+                    logger.info("简化RAG系统初始化成功")
+                    return rag_system
+            logger.warning("所有RAG系统初始化失败，使用模拟系统")
+            return MockRAGRetriever()
+    elif SIMPLE_RAG_AVAILABLE:
         logger.info("尝试初始化简化RAG系统")
         rag_system = SimpleRAGSystem()
         if rag_system.initialized:
@@ -895,15 +1029,6 @@ def initialize_retriever():
             return rag_system
         else:
             logger.warning("简化RAG系统初始化失败，使用模拟系统")
-            return MockRAGRetriever()
-    elif REAL_RAG_AVAILABLE:
-        logger.info("尝试初始化真实RAG系统")
-        rag_system = RealRAGSystem()
-        if rag_system.initialize():
-            logger.info("真实RAG系统初始化成功")
-            return rag_system
-        else:
-            logger.warning("真实RAG系统初始化失败，使用模拟系统")
             return MockRAGRetriever()
     else:
         logger.info("使用模拟RAG系统")
@@ -968,7 +1093,19 @@ def main():
         
         # 显示初始化结果（只在首次加载时显示）
         if 'init_message_shown' not in st.session_state:
-            if isinstance(rag_system, SimpleRAGSystem):
+            if isinstance(rag_system, NewRAGSystem):
+                if rag_system.initialized:
+                    st.success("✅ 新RAG系统初始化成功！")
+                    
+                    # 显示系统统计
+                    stats = rag_system.get_stats()
+                    if stats:
+                        st.info(f"📊 系统状态: Neo4j节点 {stats.get('neo4j_nodes', 0)} 个, "
+                               f"关系 {stats.get('neo4j_relationships', 0)} 个, "
+                               f"向量实体 {stats.get('vector_entities', 0)} 个")
+                else:
+                    st.error("❌ 新RAG系统初始化失败，使用模拟系统")
+            elif isinstance(rag_system, SimpleRAGSystem):
                 if rag_system.initialized:
                     st.success("✅ 简化RAG系统初始化成功！")
                     

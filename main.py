@@ -25,11 +25,17 @@ from src.knowledge.modular_rag_system import ModularRAGSystem
 import ollama
 from ollama import Message
 
+# 导入配置管理器
+from config import get_config
+
 class OllamaLLM(LLM):
     """自定义Ollama LLM包装器"""
     
-    model_name: str = "gemma3:4b"
-    base_url: str = "http://localhost:11434"
+    def __init__(self, model_name: str = None, base_url: str = None):
+        super().__init__()
+        config = get_config()
+        self.model_name = model_name or config.ollama.default_model
+        self.base_url = base_url or config.ollama.base_url
     
     @property
     def _llm_type(self) -> str:

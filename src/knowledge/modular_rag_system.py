@@ -10,12 +10,13 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from src.knowledge.intent_recognition_neo4j import KnowledgeGraphBuilder, Entity, Relation
 from src.knowledge.vector_storage import (
-    OllamaEmbeddingClient, 
-    WeaviateVectorStore, 
+    WeaviateVectorStore,
     VectorKnowledgeProcessor,
     VectorEntity,
     VectorRelation
 )
+from src.services.embedding_service import OllamaEmbeddingService as OllamaEmbeddingClient
+from config import get_config
 from py2neo import Graph, Node, Relationship
 import logging
 from typing import List, Dict, Any, Tuple, Optional
@@ -30,10 +31,16 @@ logger = logging.getLogger(__name__)
 class KnowledgeStorageManager:
     """知识存储管理器 - 负责实体和关系的存储"""
     
-    def __init__(self, neo4j_uri: str = "bolt://localhost:7687", 
-                 neo4j_auth: Tuple[str, str] = ("neo4j", "hrx274700")):
+    def __init__(self, neo4j_uri: str = None, 
+                 neo4j_auth: Tuple[str, str] = None):
         """初始化存储管理器"""
-        self.embedding_client = OllamaEmbeddingClient(model="bge-m3:latest")
+        config = get_config()
+        
+        # 使用配置文件中的设置，如果没有传入参数的话
+        neo4j_uri = neo4j_uri or config.neo4j.uri
+        neo4j_auth = neo4j_auth or config.neo4j.to_auth_tuple()
+        
+        self.embedding_client = OllamaEmbeddingClient()
         self.vector_store = WeaviateVectorStore()
         self.vector_processor = VectorKnowledgeProcessor(self.embedding_client, self.vector_store)
         self.neo4j_graph = Graph(neo4j_uri, auth=neo4j_auth)
@@ -246,10 +253,16 @@ class KnowledgeStorageManager:
 class KnowledgeRetrievalManager:
     """知识检索管理器 - 负责向量搜索和图谱搜索"""
     
-    def __init__(self, neo4j_uri: str = "bolt://localhost:7687", 
-                 neo4j_auth: Tuple[str, str] = ("neo4j", "hrx274700")):
+    def __init__(self, neo4j_uri: str = None, 
+                 neo4j_auth: Tuple[str, str] = None):
         """初始化检索管理器"""
-        self.embedding_client = OllamaEmbeddingClient(model="bge-m3:latest")
+        config = get_config()
+        
+        # 使用配置文件中的设置，如果没有传入参数的话
+        neo4j_uri = neo4j_uri or config.neo4j.uri
+        neo4j_auth = neo4j_auth or config.neo4j.to_auth_tuple()
+        
+        self.embedding_client = OllamaEmbeddingClient()
         self.vector_store = WeaviateVectorStore()
         self.vector_processor = VectorKnowledgeProcessor(self.embedding_client, self.vector_store)
         self.neo4j_graph = Graph(neo4j_uri, auth=neo4j_auth)
@@ -509,9 +522,15 @@ class KnowledgeRetrievalManager:
 class HybridSearchManager:
     """混合搜索管理器 - 整合向量搜索和图谱搜索"""
     
-    def __init__(self, neo4j_uri: str = "bolt://localhost:7687", 
-                 neo4j_auth: Tuple[str, str] = ("neo4j", "hrx274700")):
+    def __init__(self, neo4j_uri: str = None, 
+                 neo4j_auth: Tuple[str, str] = None):
         """初始化混合搜索管理器"""
+        config = get_config()
+        
+        # 使用配置文件中的设置，如果没有传入参数的话
+        neo4j_uri = neo4j_uri or config.neo4j.uri
+        neo4j_auth = neo4j_auth or config.neo4j.to_auth_tuple()
+        
         self.retrieval_manager = KnowledgeRetrievalManager(neo4j_uri, neo4j_auth)
         self.kg_builder = KnowledgeGraphBuilder()
         
@@ -671,9 +690,15 @@ class HybridSearchManager:
 class ModularRAGSystem:
     """模块化RAG系统 - 整合所有功能模块"""
     
-    def __init__(self, neo4j_uri: str = "bolt://localhost:7687", 
-                 neo4j_auth: Tuple[str, str] = ("neo4j", "hrx274700")):
+    def __init__(self, neo4j_uri: str = None, 
+                 neo4j_auth: Tuple[str, str] = None):
         """初始化模块化RAG系统"""
+        config = get_config()
+        
+        # 使用配置文件中的设置，如果没有传入参数的话
+        neo4j_uri = neo4j_uri or config.neo4j.uri
+        neo4j_auth = neo4j_auth or config.neo4j.to_auth_tuple()
+        
         self.storage_manager = KnowledgeStorageManager(neo4j_uri, neo4j_auth)
         self.retrieval_manager = KnowledgeRetrievalManager(neo4j_uri, neo4j_auth)
         self.search_manager = HybridSearchManager(neo4j_uri, neo4j_auth)

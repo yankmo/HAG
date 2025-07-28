@@ -4,8 +4,16 @@
 Neo4j数据查询验证脚本
 """
 
+import sys
+import os
+# 添加项目根目录到路径
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from py2neo import Graph
 import logging
+
+# 导入配置管理器
+from config import get_config
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -14,8 +22,9 @@ logger = logging.getLogger(__name__)
 def query_neo4j_data():
     """查询Neo4j中的数据"""
     try:
-        # 连接Neo4j
-        graph = Graph('bolt://localhost:7687', auth=('neo4j', 'hrx274700'))
+        # 获取配置并连接Neo4j
+        config = get_config()
+        graph = Graph(config.neo4j.uri, auth=(config.neo4j.username, config.neo4j.password))
         logger.info("连接Neo4j成功")
         
         # 查询节点统计

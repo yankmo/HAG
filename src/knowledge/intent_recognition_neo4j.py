@@ -13,6 +13,8 @@ from py2neo import Graph, Node, Relationship
 from dataclasses import dataclass
 import logging
 
+from config import get_config
+
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -43,9 +45,11 @@ class Relation:
 class OllamaClient:
     """Ollama客户端"""
     
-    def __init__(self, base_url: str = "http://localhost:11434", model: str = "gemma3:4b"):
-        self.base_url = base_url
-        self.model = model
+    def __init__(self, base_url: str = None, model: str = None):
+        config = get_config()
+        
+        self.base_url = base_url or config.ollama.base_url
+        self.model = model or config.ollama.default_model
         
     def generate(self, prompt: str, system_prompt: str = None, timeout: int = 180) -> str:
         """生成文本"""
@@ -249,7 +253,13 @@ Extract key medical entities and their relationships to build a knowledge graph.
 class Neo4jImporter:
     """Neo4j数据导入器"""
     
-    def __init__(self, uri: str = "bolt://localhost:7687", username: str = "neo4j", password: str = "hrx274700"):
+    def __init__(self, uri: str = None, username: str = None, password: str = None):
+        config = get_config()
+        
+        uri = uri or config.neo4j.uri
+        username = username or config.neo4j.username
+        password = password or config.neo4j.password
+        
         try:
             self.graph = Graph(uri, auth=(username, password))
             logger.info("Neo4j连接成功")

@@ -9,12 +9,12 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.knowledge.vector_storage import (
-    OllamaEmbeddingClient, 
-    WeaviateVectorStore, 
+    WeaviateVectorStore,
     VectorKnowledgeProcessor,
     VectorEntity,
     VectorRelation
 )
+from src.services.embedding_service import OllamaEmbeddingService as OllamaEmbeddingClient
 import logging
 
 # 配置日志
@@ -25,7 +25,7 @@ def test_embedding_client():
     """测试向量化客户端"""
     print("🧪 测试向量化客户端...")
     
-    client = OllamaEmbeddingClient(model="bge-m3:latest")
+    client = OllamaEmbeddingClient()
     
     # 测试单个文本向量化
     test_text = "帕金森病是一种神经退行性疾病"
@@ -97,7 +97,7 @@ def test_vector_processor():
     
     try:
         # 初始化组件
-        embedding_client = OllamaEmbeddingClient(model="bge-m3:latest")
+        embedding_client = OllamaEmbeddingClient()
         vector_store = WeaviateVectorStore()
         processor = VectorKnowledgeProcessor(embedding_client, vector_store)
         

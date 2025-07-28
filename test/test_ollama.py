@@ -7,13 +7,22 @@ Ollama 连接测试脚本
 
 import requests
 import json
+import sys
+import os
+
+# 添加项目根目录到Python路径
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+
+from config import get_config
 from ollama import embeddings, chat, Message
 
 def test_direct_api():
     """直接测试 Ollama HTTP API"""
     try:
+        config = get_config()
         print("=== 测试直接 HTTP API ===")
-        response = requests.get("http://localhost:11434/api/tags", timeout=10)
+        response = requests.get(f"{config.ollama.base_url}/api/tags", timeout=10)
         print(f"状态码: {response.status_code}")
         if response.status_code == 200:
             data = response.json()
@@ -29,16 +38,17 @@ def test_direct_api():
 def test_ollama_client():
     """测试 ollama Python 客户端"""
     try:
+        config = get_config()
         print("\n=== 测试 ollama Python 客户端 ===")
         
         # 测试 embeddings
         print("测试 embeddings...")
-        response = embeddings(model='nomic-embed-text', prompt='Hello world')
+        response = embeddings(model=config.ollama.embedding_model, prompt='Hello world')
         print(f"Embeddings 成功，向量维度: {len(response['embedding'])}")
         
         # 测试 chat
         print("测试 chat...")
-        response = chat('deepseek-r1:7b', [Message(role='user', content='Hello')])
+        response = chat(config.ollama.default_model, [Message(role='user', content='Hello')])
         print(f"Chat 成功: {response['message']['content'][:50]}...")
         
         return True
@@ -49,14 +59,15 @@ def test_ollama_client():
 def test_with_timeout():
     """测试带超时的连接"""
     try:
+        config = get_config()
         print("\n=== 测试带超时的连接 ===")
         import ollama
         
         # 设置客户端超时
-        client = ollama.Client(host='http://localhost:11434', timeout=30)
+        client = ollama.Client(host=config.ollama.base_url, timeout=config.ollama.timeout)
         
         # 测试 embeddings
-        response = client.embeddings(model='nomic-embed-text', prompt='test')
+        response = client.embeddings(model=config.ollama.embedding_model, prompt='test')
         print(f"带超时的 embeddings 成功，向量维度: {len(response['embedding'])}")
         
         return True

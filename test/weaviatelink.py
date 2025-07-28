@@ -1,8 +1,18 @@
 import weaviate
+import sys
+import os
+
+# 添加项目根目录到Python路径
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+
+from config import get_config
 from langchain_community.document_loaders import DirectoryLoader, WebBaseLoader
 import pandas as pd
 
-client = weaviate.Client(url='http://localhost:8080')
+# 获取配置并创建客户端
+config = get_config()
+client = weaviate.Client(url=config.weaviate.url)
 class_name = 'Stephen_Chow'  # class的名字
 
 # v4版本的集合定义

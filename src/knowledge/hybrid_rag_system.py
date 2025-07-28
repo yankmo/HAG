@@ -10,12 +10,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.knowledge.intent_recognition_neo4j import KnowledgeGraphBuilder, Entity, Relation
 from src.knowledge.vector_storage import (
-    OllamaEmbeddingClient, 
     WeaviateVectorStore, 
     VectorKnowledgeProcessor,
     VectorEntity,
     VectorRelation
 )
+from src.services.embedding_service import OllamaEmbeddingService as OllamaEmbeddingClient
 import logging
 from typing import List, Dict, Any, Tuple
 
@@ -29,7 +29,7 @@ class HybridRAGSystem:
     def __init__(self):
         # 初始化各个组件
         self.kg_builder = KnowledgeGraphBuilder()
-        self.embedding_client = OllamaEmbeddingClient(model="bgm-m3:latest")
+        self.embedding_client = OllamaEmbeddingClient()
         self.vector_store = WeaviateVectorStore()
         self.vector_processor = VectorKnowledgeProcessor(self.embedding_client, self.vector_store)
         

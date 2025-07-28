@@ -10,10 +10,10 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.knowledge.vector_storage import (
-    OllamaEmbeddingClient, 
     WeaviateVectorStore, 
     VectorKnowledgeProcessor
 )
+from src.services.embedding_service import OllamaEmbeddingService as OllamaEmbeddingClient
 import logging
 
 # 配置日志

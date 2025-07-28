@@ -8,7 +8,8 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.knowledge.vector_storage import OllamaEmbeddingClient, WeaviateVectorStore
+from src.knowledge.vector_storage import WeaviateVectorStore
+from src.services.embedding_service import OllamaEmbeddingService as OllamaEmbeddingClient
 
 def main():
     print("🚀 开始向量检索验证")

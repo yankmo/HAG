@@ -10,12 +10,12 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.knowledge.vector_storage import (
-    OllamaEmbeddingClient, 
-    WeaviateVectorStore, 
+    WeaviateVectorStore,
     VectorKnowledgeProcessor,
     VectorEntity,
     VectorRelation
 )
+from src.services.embedding_service import OllamaEmbeddingService as OllamaEmbeddingClient
 import logging
 import json
 import numpy as np

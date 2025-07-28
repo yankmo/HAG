@@ -10,14 +10,22 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from src.knowledge.intent_recognition_neo4j import KnowledgeGraphBuilder, Entity, Relation
 from src.knowledge.vector_storage import (
-    OllamaEmbeddingClient, 
     WeaviateVectorStore, 
     VectorKnowledgeProcessor,
     VectorEntity,
     VectorRelation
 )
+from src.services.embedding_service import OllamaEmbeddingService as OllamaEmbeddingClient
 from py2neo import Graph, Node, Relationship
 import logging
+import sys
+import os
+
+# 添加项目根目录到Python路径
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, project_root)
+
+from config import get_config
 from typing import List, Dict, Any, Tuple
 from datetime import datetime
 import uuid
@@ -30,12 +38,15 @@ class HybridVectorGraphSystem:
     """混合向量图谱系统"""
     
     def __init__(self):
+        # 获取配置
+        config = get_config()
+        
         # 初始化各个组件
         self.kg_builder = KnowledgeGraphBuilder()
-        self.embedding_client = OllamaEmbeddingClient(model="bge-m3:latest")
-        self.vector_store = WeaviateVectorStore()
+        self.embedding_client = OllamaEmbeddingClient()  # 使用配置中的默认模型
+        self.vector_store = WeaviateVectorStore()  # 使用配置中的默认URL
         self.vector_processor = VectorKnowledgeProcessor(self.embedding_client, self.vector_store)
-        self.neo4j_graph = Graph('bolt://localhost:7687', auth=('neo4j', 'hrx274700'))
+        self.neo4j_graph = Graph(config.neo4j.uri, auth=config.neo4j.to_auth_tuple())
         
         logger.info("混合向量图谱系统初始化完成")
     
