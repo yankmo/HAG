@@ -4,8 +4,8 @@
 """
 
 import os
-from typing import Dict, Any, Optional
-from dataclasses import dataclass
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass, field
 import json
 import yaml
 
@@ -15,7 +15,7 @@ class Neo4jConfig:
     """Neo4j数据库配置"""
     uri: str = "bolt://localhost:7687"
     username: str = "neo4j"
-    password: str = "hrx274700"
+    password: str = ""  # 从环境变量读取，不设置默认值
     database: str = "neo4j"
     
     def to_auth_tuple(self):
@@ -30,6 +30,7 @@ class OllamaConfig:
     default_model: str = "gemma3:4b"
     embedding_model: str = "bge-m3:latest"
     timeout: int = 30
+    available_models: List[str] = field(default_factory=lambda: ["gemma3:4b", "llama3:8b", "qwen2:7b"])
     
     @property
     def api_generate_url(self):

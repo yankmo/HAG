@@ -7,7 +7,14 @@
 from .embedding_service import OllamaEmbeddingService, OllamaEmbeddingClient
 from .llm_service import OllamaLLMService, SimpleOllamaLLM, OllamaLLM
 from .text_processing_service import TextProcessingService, TextChunk
-from .retrieval_service import RetrievalService, SimilarityCalculator, SearchResult, HybridSearchResult, DistanceMetric
+from .retrieval_service import RetrievalService
+from .neo4j_retrieval_service import GraphRetrievalService
+from .hybrid_retrieval_service import HybridRetrievalService
+from .rag_pipeline import RAGPipeline
+from .common_types import (
+    SimilarityCalculator, SearchResult, HybridSearchResult, 
+    DistanceMetric, IntentAwareSearchResult
+)
 
 __all__ = [
     'OllamaEmbeddingService',
@@ -18,8 +25,12 @@ __all__ = [
     'TextProcessingService',
     'TextChunk',
     'RetrievalService',
+    'GraphRetrievalService',
+    'HybridRetrievalService',
+    'RAGPipeline',
     'SimilarityCalculator',
     'SearchResult',
     'HybridSearchResult',
-    'DistanceMetric'
+    'DistanceMetric',
+    'IntentAwareSearchResult'
 ]

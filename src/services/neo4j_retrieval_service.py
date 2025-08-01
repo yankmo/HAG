@@ -1,483 +1,464 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Neo4j检索服务模块
-提供基于Neo4j的检索功能，兼容现有接口
+Neo4j图谱检索服务模块
+专门负责知识图谱的节点和关系检索，不涉及向量计算
 """
 
-import numpy as np
 import sys
 import os
 import logging
 from typing import List, Dict, Any, Optional, Tuple
-from dataclasses import dataclass
-from enum import Enum
 
 # 添加项目根目录到Python路径
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, project_root)
 
 from config import get_config
-from src.services.embedding_service import OllamaEmbeddingService
 from src.knowledge.neo4j_vector_storage import Neo4jVectorStore, Neo4jIntentRecognizer, IntentResult
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class DistanceMetric(Enum):
-    """距离度量类型"""
-    COSINE = "cosine"
-    EUCLIDEAN = "euclidean"
-    MANHATTAN = "manhattan"
-    DOT_PRODUCT = "dot_product"
-
-@dataclass
-class SearchResult:
-    """搜索结果"""
-    id: str
-    content: str
-    score: float
-    distance: float
-    metadata: Dict[str, Any] = None
-    distance_metric: str = ""
+class GraphRetrievalService:
+    """基于Neo4j的图谱检索服务 - 专门负责节点和关系查询"""
     
-    def __post_init__(self):
-        if self.metadata is None:
-            self.metadata = {}
-
-@dataclass
-class HybridSearchResult:
-    """混合搜索结果"""
-    cosine_results: List[SearchResult]
-    euclidean_results: List[SearchResult]
-    hybrid_results: List[SearchResult]
-    statistics: Dict[str, Any]
-
-@dataclass
-class IntentAwareSearchResult:
-    """意图感知搜索结果"""
-    intent: IntentResult
-    search_results: HybridSearchResult
-    related_knowledge: Dict[str, Any]
-    recommendations: List[str]
-
-class SimilarityCalculator:
-    """相似度计算器"""
-    
-    @staticmethod
-    def cosine_similarity(vector1: List[float], vector2: List[float]) -> float:
-        """计算余弦相似度"""
+    def __init__(self, graph_db_config):
+        """
+        初始化图谱检索服务
+        
+        Args:
+            graph_db_config: Neo4j数据库配置对象
+        """
         try:
-            v1 = np.array(vector1)
-            v2 = np.array(vector2)
+            # 初始化Neo4j连接
+            from py2neo import Graph
+            self.graph = Graph(
+                host=getattr(graph_db_config, 'host', 'localhost'),
+                port=getattr(graph_db_config, 'port', 7687),
+                user=getattr(graph_db_config, 'user', 'neo4j'),
+                password=getattr(graph_db_config, 'password', 'password')
+            )
             
-            dot_product = np.dot(v1, v2)
-            norm_v1 = np.linalg.norm(v1)
-            norm_v2 = np.linalg.norm(v2)
+            # 初始化意图识别器
+            self.intent_recognizer = Neo4jIntentRecognizer(graph_db_config)
             
-            if norm_v1 == 0 or norm_v2 == 0:
-                return 0.0
-            
-            similarity = dot_product / (norm_v1 * norm_v2)
-            return max(0.0, min(1.0, similarity))
+            logger.info("图谱检索服务初始化成功")
             
         except Exception as e:
-            logger.error(f"计算余弦相似度失败: {e}")
-            return 0.0
-    
-    @staticmethod
-    def euclidean_distance(vector1: List[float], vector2: List[float]) -> float:
-        """计算欧氏距离"""
-        try:
-            v1 = np.array(vector1)
-            v2 = np.array(vector2)
-            distance = np.linalg.norm(v1 - v2)
-            return float(distance)
-            
-        except Exception as e:
-            logger.error(f"计算欧氏距离失败: {e}")
-            return float('inf')
-
-class Neo4jRetrievalService:
-    """基于Neo4j的检索服务"""
-    
-    def __init__(self, embedding_service: OllamaEmbeddingService = None, 
-                 vector_store: Neo4jVectorStore = None,
-                 intent_recognizer: Neo4jIntentRecognizer = None):
-        """初始化检索服务"""
-        self.embedding_service = embedding_service or OllamaEmbeddingService()
-        self.vector_store = vector_store or Neo4jVectorStore()
-        self.intent_recognizer = intent_recognizer or Neo4jIntentRecognizer(self.vector_store)
-        self.similarity_calculator = SimilarityCalculator()
-        self.config = get_config()
-        
-        # 混合检索权重配置
-        self.cosine_weight = 0.7
-        self.euclidean_weight = 0.3
-        
-        logger.info("Neo4j检索服务初始化完成")
+            logger.error(f"图谱检索服务初始化失败: {e}")
+            raise
     
     def get_stats(self):
-        """获取系统统计信息"""
+        """获取图谱统计信息"""
         try:
-            # 获取Neo4j统计信息
-            neo4j_stats = self.vector_store.get_stats()
+            # 获取节点统计
+            node_count = self.graph.run("MATCH (n) RETURN count(n) as count").data()[0]['count']
+            
+            # 获取关系统计
+            relationship_count = self.graph.run("MATCH ()-[r]-() RETURN count(r) as count").data()[0]['count']
+            
+            # 获取实体类型分布
+            entity_types = self.graph.run("""
+                MATCH (n:Entity)
+                RETURN n.type as type, count(n) as count
+                ORDER BY count DESC
+            """).data()
             
             return {
-                "neo4j_nodes": neo4j_stats.get("entities", 0),
-                "neo4j_relationships": neo4j_stats.get("relations", 0),
-                "neo4j_vector_entities": neo4j_stats.get("vector_entities", 0),
-                "neo4j_vector_relations": neo4j_stats.get("vector_relations", 0),
-                "weaviate_entities": 0,  # 新系统不使用Weaviate
-                "weaviate_relations": 0,
-                "status": "Neo4j检索服务",
-                "cosine_weight": self.cosine_weight,
-                "euclidean_weight": self.euclidean_weight,
-                "total_entities": neo4j_stats.get("entities", 0),
-                "total_relations": neo4j_stats.get("relations", 0)
+                'total_nodes': node_count,
+                'total_relationships': relationship_count,
+                'entity_types': entity_types,
+                'status': 'active'
             }
+            
         except Exception as e:
-            logger.error(f"获取统计信息失败: {e}")
+            logger.error(f"获取图谱统计失败: {e}")
             return {
-                "neo4j_nodes": 0,
-                "neo4j_relationships": 0,
-                "neo4j_vector_entities": 0,
-                "neo4j_vector_relations": 0,
-                "weaviate_entities": 0,
-                "weaviate_relations": 0,
-                "status": f"错误: {e}",
-                "cosine_weight": self.cosine_weight,
-                "euclidean_weight": self.euclidean_weight,
-                "total_entities": 0,
-                "total_relations": 0
+                'total_nodes': 0,
+                'total_relationships': 0,
+                'entity_types': [],
+                'status': 'error',
+                'error': str(e)
             }
     
-    def search_by_cosine(self, query: str, limit: int = 10) -> List[SearchResult]:
-        """使用余弦相似度搜索"""
+    def search_entities_by_type(self, entity_type: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """根据类型搜索实体"""
         try:
-            # 向量化查询
-            query_vector = self.embedding_service.embed_text(query)
-            if not query_vector:
-                logger.error("查询向量化失败")
-                return []
+            entities = self.graph.run("""
+                MATCH (e:Entity {type: $entity_type})
+                RETURN e.name as name, e.type as type, e.description as description
+                LIMIT $limit
+            """, {
+                'entity_type': entity_type,
+                'limit': limit
+            }).data()
             
-            # 使用Neo4j进行余弦相似度搜索
-            raw_results = self.vector_store.search_entities(
-                query_vector, limit, "cosine"
-            )
-            
-            # 转换为SearchResult格式
-            results = []
-            for result in raw_results:
-                search_result = SearchResult(
-                    id=str(result.get("id", "")),
-                    content=result.get("source_text", ""),
-                    score=result.get("certainty", 0.0),
-                    distance=result.get("distance", 0.0),
-                    metadata={
-                        "name": result.get("name", ""),
-                        "type": result.get("type", ""),
-                        "description": result.get("description", ""),
-                        "neo4j_id": str(result.get("id", ""))
-                    },
-                    distance_metric="cosine"
-                )
-                results.append(search_result)
-            
-            logger.info(f"余弦相似度搜索完成: {len(results)} 个结果")
-            return results
+            return entities
             
         except Exception as e:
-            logger.error(f"余弦相似度搜索失败: {e}")
+            logger.error(f"按类型搜索实体失败: {e}")
             return []
     
-    def search_by_euclidean(self, query: str, limit: int = 10) -> List[SearchResult]:
-        """使用欧氏距离搜索"""
+    def search_relationships_by_type(self, relation_type: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """根据类型搜索关系"""
         try:
-            # 向量化查询
-            query_vector = self.embedding_service.embed_text(query)
-            if not query_vector:
-                logger.error("查询向量化失败")
-                return []
+            # 数据库中的关系类型是RELATION，需要查找关系的type属性
+            relationships = self.graph.run("""
+                MATCH (e1:Entity)-[r:RELATION]->(e2:Entity)
+                WHERE r.type = $relation_type OR toLower(r.type) CONTAINS toLower($relation_type)
+                RETURN e1.name as source, r.type as type, 
+                       COALESCE(r.description, '') as description, 
+                       e2.name as target,
+                       COALESCE(r.source_text, '') as source_text
+                LIMIT $limit
+            """, {
+                'relation_type': relation_type,
+                'limit': limit
+            }).data()
             
-            # 使用Neo4j进行欧氏距离搜索
-            raw_results = self.vector_store.search_entities(
-                query_vector, limit, "euclidean"
-            )
-            
-            # 转换为SearchResult格式
-            results = []
-            for result in raw_results:
-                # 欧氏距离越小越相似，转换为相似度分数
-                distance = result.get("distance", float('inf'))
-                score = 1.0 / (1.0 + distance) if distance != float('inf') else 0.0
+            # 为关系添加更多信息
+            for rel in relationships:
+                if not rel.get('description') and rel.get('source_text'):
+                    source_text = rel['source_text']
+                    rel['description'] = source_text[:100] + '...' if len(source_text) > 100 else source_text
                 
-                search_result = SearchResult(
-                    id=str(result.get("id", "")),
-                    content=result.get("source_text", ""),
-                    score=score,
-                    distance=distance,
-                    metadata={
-                        "name": result.get("name", ""),
-                        "type": result.get("type", ""),
-                        "description": result.get("description", ""),
-                        "neo4j_id": str(result.get("id", ""))
-                    },
-                    distance_metric="euclidean"
-                )
-                results.append(search_result)
+                # 确保描述不为空
+                if not rel.get('description'):
+                    rel['description'] = f"{rel['source']} 与 {rel['target']} 之间的 {rel['type']} 关系"
             
-            logger.info(f"欧氏距离搜索完成: {len(results)} 个结果")
-            return results
+            return relationships
             
         except Exception as e:
-            logger.error(f"欧氏距离搜索失败: {e}")
+            logger.error(f"按类型搜索关系失败: {e}")
             return []
     
-    def search_hybrid(self, query: str, limit: int = 10) -> HybridSearchResult:
-        """混合检索（余弦相似度 + 欧氏距离）"""
+    def search_relationships_by_query(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """根据查询搜索相关关系 - 新的图谱匹配逻辑"""
         try:
-            logger.info(f"开始混合检索: {query}")
+            logger.info(f"开始图谱关系搜索: {query}")
             
-            # 向量化查询
-            query_vector = self.embedding_service.embed_text(query)
-            if not query_vector:
-                logger.error("查询向量化失败")
-                return HybridSearchResult([], [], [], {})
+            # 第一步：找到最相关的核心节点
+            core_entities = self._find_most_relevant_entities(query, limit=5)
+            logger.info(f"找到 {len(core_entities)} 个核心实体: {[e['name'] for e in core_entities]}")
             
-            # 使用Neo4j的混合检索功能
-            raw_results = self.vector_store.search_entities_hybrid(query_vector, limit)
+            if not core_entities:
+                logger.info("未找到相关核心实体")
+                return []
             
-            # 转换余弦相似度结果
-            cosine_results = []
-            for result in raw_results.get("cosine_results", []):
-                search_result = SearchResult(
-                    id=str(result.get("id", "")),
-                    content=result.get("source_text", ""),
-                    score=result.get("certainty", 0.0),
-                    distance=result.get("distance", 0.0),
-                    metadata={
-                        "name": result.get("name", ""),
-                        "type": result.get("type", ""),
-                        "description": result.get("description", ""),
-                        "neo4j_id": str(result.get("id", ""))
-                    },
-                    distance_metric="cosine"
-                )
-                cosine_results.append(search_result)
+            # 第二步：基于核心节点找到相关的节点和关系
+            relationships = []
             
-            # 转换欧氏距离结果
-            euclidean_results = []
-            for result in raw_results.get("euclidean_results", []):
-                distance = result.get("distance", float('inf'))
-                score = 1.0 / (1.0 + distance) if distance != float('inf') else 0.0
+            for core_entity in core_entities:
+                entity_name = core_entity['name']
+                logger.info(f"查找实体 '{entity_name}' 的关系网络")
                 
-                search_result = SearchResult(
-                    id=str(result.get("id", "")),
-                    content=result.get("source_text", ""),
-                    score=score,
-                    distance=distance,
-                    metadata={
-                        "name": result.get("name", ""),
-                        "type": result.get("type", ""),
-                        "description": result.get("description", ""),
-                        "neo4j_id": str(result.get("id", ""))
-                    },
-                    distance_metric="euclidean"
-                )
-                euclidean_results.append(search_result)
-            
-            # 转换混合结果
-            hybrid_results = []
-            for result in raw_results.get("hybrid_results", []):
-                # 使用Neo4j计算的混合分数
-                hybrid_score = result.get("hybrid_score", 0.0)
+                # 查找与核心实体直接相关的所有关系
+                entity_relationships = self.graph.run("""
+                    MATCH (core:Entity {name: $entity_name})-[r:RELATION]-(related:Entity)
+                    RETURN core.name as source, 
+                           r.type as type, 
+                           COALESCE(r.description, '') as description, 
+                           related.name as target,
+                           COALESCE(r.source_text, '') as source_text,
+                           related.type as target_type,
+                           COALESCE(related.description, '') as target_description
+                    ORDER BY 
+                        CASE 
+                            WHEN toLower(related.name) CONTAINS toLower($query_keyword) THEN 1
+                            WHEN toLower(r.type) CONTAINS toLower($query_keyword) THEN 2
+                            WHEN toLower(r.description) CONTAINS toLower($query_keyword) THEN 3
+                            ELSE 4
+                        END
+                    LIMIT $limit
+                """, {
+                    'entity_name': entity_name,
+                    'query_keyword': self._extract_main_keyword(query),
+                    'limit': limit
+                }).data()
                 
-                search_result = SearchResult(
-                    id=str(result.get("id", "")),
-                    content=result.get("source_text", ""),
-                    score=hybrid_score,
-                    distance=result.get("distance", 0.0),
-                    metadata={
-                        "name": result.get("name", ""),
-                        "type": result.get("type", ""),
-                        "description": result.get("description", ""),
-                        "neo4j_id": str(result.get("id", "")),
-                        "cosine_rank": result.get("rank_cosine", limit + 1),
-                        "euclidean_rank": result.get("rank_euclidean", limit + 1),
-                        "euclidean_distance": result.get("euclidean_distance", 0.0)
-                    },
-                    distance_metric="hybrid"
-                )
-                hybrid_results.append(search_result)
+                # 处理关系数据
+                for rel in entity_relationships:
+                    # 确保关系描述不为空
+                    if not rel.get('description') or rel['description'].strip() == '':
+                        if rel.get('source_text'):
+                            source_text = rel['source_text']
+                            rel['description'] = source_text[:200] + '...' if len(source_text) > 200 else source_text
+                        else:
+                            rel['description'] = f"{rel['source']} 与 {rel['target']} 之间存在 {rel['type']} 关系"
+                    
+                    # 添加关系相关性评分
+                    rel['relevance_score'] = self._calculate_relationship_relevance(rel, query)
+                    
+                    relationships.append(rel)
             
-            # 统计信息
-            statistics = {
-                "query": query,
-                "total_cosine": len(cosine_results),
-                "total_euclidean": len(euclidean_results),
-                "total_hybrid": len(hybrid_results),
-                "total_unique": raw_results.get("total_unique", 0),
-                "cosine_weight": self.cosine_weight,
-                "euclidean_weight": self.euclidean_weight
-            }
+            # 第三步：按相关性排序并去重
+            relationships = self._deduplicate_and_rank_relationships(relationships, limit)
             
-            logger.info(f"混合检索完成: {statistics}")
-            
-            return HybridSearchResult(
-                cosine_results=cosine_results,
-                euclidean_results=euclidean_results,
-                hybrid_results=hybrid_results,
-                statistics=statistics
-            )
+            logger.info(f"图谱关系搜索完成: {len(relationships)} 个结果")
+            return relationships
             
         except Exception as e:
-            logger.error(f"混合检索失败: {e}")
-            return HybridSearchResult([], [], [], {})
+            logger.error(f"图谱关系搜索失败: {e}")
+            return []
     
-    def search_with_intent(self, query: str, limit: int = 10) -> IntentAwareSearchResult:
-        """意图感知搜索"""
+    def _find_most_relevant_entities(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+        """找到与查询最相关的核心实体"""
         try:
-            logger.info(f"开始意图感知搜索: {query}")
+            keywords = self._extract_keywords(query)
+            main_keyword = self._extract_main_keyword(query)
+            
+            # 构建实体搜索查询，按相关性排序
+            entities = self.graph.run("""
+                MATCH (e:Entity)
+                WHERE toLower(e.name) CONTAINS toLower($main_keyword)
+                   OR toLower(e.description) CONTAINS toLower($main_keyword)
+                   OR ANY(keyword IN $keywords WHERE toLower(e.name) CONTAINS toLower(keyword))
+                RETURN e.name as name, 
+                       e.type as type, 
+                       COALESCE(e.description, '') as description,
+                       CASE 
+                           WHEN toLower(e.name) = toLower($main_keyword) THEN 1
+                           WHEN toLower(e.name) CONTAINS toLower($main_keyword) THEN 2
+                           WHEN toLower(e.description) CONTAINS toLower($main_keyword) THEN 3
+                           ELSE 4
+                       END as relevance_rank
+                ORDER BY relevance_rank, e.name
+                LIMIT $limit
+            """, {
+                'main_keyword': main_keyword,
+                'keywords': keywords,
+                'limit': limit
+            }).data()
+            
+            return entities
+            
+        except Exception as e:
+            logger.error(f"查找核心实体失败: {e}")
+            return []
+    
+    def _extract_main_keyword(self, query: str) -> str:
+        """提取查询的主要关键词"""
+        # 医学关键词优先级
+        medical_priority_keywords = ['帕金森', 'Parkinson', '帕金森氏症']
+        
+        for keyword in medical_priority_keywords:
+            if keyword in query:
+                return keyword
+        
+        # 如果没有医学关键词，返回最长的词
+        words = query.replace('？', '').replace('?', '').replace('吗', '').split()
+        if words:
+            return max(words, key=len)
+        
+        return query
+    
+    def _calculate_relationship_relevance(self, relationship: Dict[str, Any], query: str) -> float:
+        """计算关系与查询的相关性评分"""
+        score = 0.0
+        query_lower = query.lower()
+        
+        # 检查目标实体名称匹配
+        if query_lower in relationship['target'].lower():
+            score += 3.0
+        
+        # 检查关系类型匹配
+        if any(keyword in relationship['type'].lower() for keyword in ['treat', 'therapy', 'cure', '治疗']):
+            if any(keyword in query_lower for keyword in ['治疗', 'treat', 'cure', '可以']):
+                score += 2.0
+        
+        # 检查描述匹配
+        if query_lower in relationship['description'].lower():
+            score += 1.0
+        
+        return score
+    
+    def _deduplicate_and_rank_relationships(self, relationships: List[Dict[str, Any]], limit: int) -> List[Dict[str, Any]]:
+        """去重并按相关性排序关系"""
+        # 去重
+        seen = set()
+        unique_relationships = []
+        
+        for rel in relationships:
+            rel_key = (rel['source'], rel['type'], rel['target'])
+            if rel_key not in seen:
+                seen.add(rel_key)
+                unique_relationships.append(rel)
+        
+        # 按相关性评分排序
+        unique_relationships.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
+        
+        return unique_relationships[:limit]
+    
+    def get_entity_relationships(self, entity_name: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """查询实体的所有关系"""
+        try:
+            query = """
+            MATCH (a {name: $entity_name})-[r]-(b)
+            RETURN a.name as source_name, b.name as target_name, 
+                   type(r) as relation_type, r.description as description,
+                   id(r) as id, r.source_text as source_text
+            LIMIT $limit
+            """
+            
+            with self.vector_store.driver.session() as session:
+                result = session.run(query, entity_name=entity_name, limit=limit)
+                relationships = []
+                for record in result:
+                    relationships.append({
+                        "id": record["id"],
+                        "source_name": record["source_name"],
+                        "target_name": record["target_name"],
+                        "relation_type": record["relation_type"],
+                        "description": record["description"],
+                        "source_text": record["source_text"]
+                    })
+                
+                logger.info(f"获取实体关系完成: {len(relationships)} 个结果")
+                return relationships
+                
+        except Exception as e:
+            logger.error(f"获取实体关系失败: {e}")
+            return []
+    
+    def search_entities_by_name(self, name_pattern: str, limit: int = 10) -> List[Dict[str, Any]]:
+        """根据名称模式搜索实体"""
+        try:
+            # 提取关键词进行搜索
+            keywords = self._extract_keywords(name_pattern)
+            logger.info(f"从查询 '{name_pattern}' 提取关键词: {keywords}")
+            
+            # 使用单一查询避免重复
+            keyword_conditions = []
+            params = {'limit': limit}
+            
+            for i, keyword in enumerate(keywords):
+                param_name = f'keyword_{i}'
+                keyword_conditions.append(f"""
+                    toLower(e.name) CONTAINS toLower(${param_name})
+                """)
+                params[param_name] = keyword
+            
+            if not keyword_conditions:
+                return []
+            
+            query = f"""
+                MATCH (e:Entity)
+                WHERE {' OR '.join(keyword_conditions)}
+                RETURN DISTINCT e.name as name, e.type as type, 
+                       COALESCE(e.description, '') as description,
+                       e.source_text as source_text
+                LIMIT $limit
+            """
+            
+            entities = self.graph.run(query, params).data()
+            
+            # 为每个实体添加更多信息
+            for entity in entities:
+                if not entity.get('description'):
+                    # 如果没有描述，使用source_text的前100个字符作为描述
+                    source_text = entity.get('source_text', '')
+                    if source_text:
+                        entity['description'] = source_text[:100] + '...' if len(source_text) > 100 else source_text
+                    else:
+                        entity['description'] = f"{entity['type']}类型的实体"
+            
+            logger.info(f"搜索实体完成: {len(entities)} 个结果")
+            return entities
+            
+        except Exception as e:
+            logger.error(f"按名称搜索实体失败: {e}")
+            return []
+    
+    def _extract_keywords(self, query: str) -> List[str]:
+        """从查询中提取关键词"""
+        import re
+        
+        # 定义医学相关关键词
+        medical_keywords = [
+            '帕金森', 'Parkinson', '治疗', '症状', '疾病', '药物', '手术', 
+            '康复', '运动', '疗法', '诊断', '预防', '病因', '发病', '机制'
+        ]
+        
+        # 移除标点符号和停用词
+        cleaned_query = re.sub(r'[？?！!。，,、；;：:]', ' ', query)
+        words = cleaned_query.split()
+        
+        # 提取关键词
+        keywords = []
+        for word in words:
+            if len(word) >= 2:  # 至少2个字符
+                keywords.append(word)
+        
+        # 添加医学关键词匹配
+        for keyword in medical_keywords:
+            if keyword in query:
+                keywords.append(keyword)
+        
+        # 去重并返回
+        return list(set(keywords)) if keywords else [query]
+    
+    def recognize_intent(self, query: str) -> 'IntentResult':
+        """识别查询意图"""
+        try:
+            return self.intent_recognizer.recognize_intent(query)
+        except Exception as e:
+            logger.error(f"意图识别失败: {e}")
+            from src.knowledge.intent_recognition_neo4j import IntentResult
+            return IntentResult("unknown", 0.0, [], [], {"error": str(e)})
+    
+    def search_with_intent(self, query: str, limit: int = 10) -> Dict[str, Any]:
+        """基于意图的图谱搜索"""
+        try:
+            logger.info(f"开始意图感知图谱搜索: {query}")
             
             # 识别意图
             intent_result = self.intent_recognizer.recognize_intent(query)
             logger.info(f"识别意图: {intent_result.intent_type}, 置信度: {intent_result.confidence:.2f}")
             
-            # 执行混合检索
-            search_results = self.search_hybrid(query, limit)
+            # 基于意图搜索相关实体和关系
+            entities = []
+            relationships = []
             
-            # 获取相关知识
-            related_knowledge = self.intent_recognizer.get_related_knowledge(intent_result, limit)
+            # 根据意图类型搜索不同的实体
+            if intent_result.intent_type in ["treatment", "therapy"]:
+                entities = self.search_entities_by_type("Treatment", limit)
+                entities.extend(self.search_entities_by_type("Drug", limit))
+            elif intent_result.intent_type in ["symptom", "symptoms"]:
+                entities = self.search_entities_by_type("Symptom", limit)
+            elif intent_result.intent_type in ["disease", "condition"]:
+                entities = self.search_entities_by_type("Disease", limit)
+            elif intent_result.intent_type in ["cause", "etiology"]:
+                relationships = self.search_relationships_by_type("CAUSES", limit)
+            else:
+                # 通用搜索
+                for entity in intent_result.entities:
+                    entity_rels = self.get_entity_relationships(entity, limit)
+                    relationships.extend(entity_rels.get('relationships', []))
             
-            # 生成推荐
-            recommendations = self._generate_recommendations(intent_result, search_results)
-            
-            return IntentAwareSearchResult(
-                intent=intent_result,
-                search_results=search_results,
-                related_knowledge=related_knowledge,
-                recommendations=recommendations
-            )
-            
-        except Exception as e:
-            logger.error(f"意图感知搜索失败: {e}")
-            return IntentAwareSearchResult(
-                intent=IntentResult("unknown", 0.0, [], [], {"error": str(e)}),
-                search_results=HybridSearchResult([], [], [], {}),
-                related_knowledge={},
-                recommendations=[]
-            )
-    
-    def _generate_recommendations(self, intent: IntentResult, 
-                                search_results: HybridSearchResult) -> List[str]:
-        """生成搜索推荐"""
-        recommendations = []
-        
-        try:
-            # 基于意图类型生成推荐
-            if intent.intent_type == "treatment":
-                recommendations.extend([
-                    "查看相关治疗方法",
-                    "了解药物治疗选项",
-                    "探索非药物治疗方案"
-                ])
-            elif intent.intent_type == "symptom":
-                recommendations.extend([
-                    "查看相关症状描述",
-                    "了解症状发展过程",
-                    "探索症状管理方法"
-                ])
-            elif intent.intent_type == "cause":
-                recommendations.extend([
-                    "了解病因机制",
-                    "查看风险因素",
-                    "探索预防措施"
-                ])
-            elif intent.intent_type == "diagnosis":
-                recommendations.extend([
-                    "了解诊断标准",
-                    "查看检查方法",
-                    "探索鉴别诊断"
-                ])
-            
-            # 基于搜索结果生成推荐
-            if search_results.hybrid_results:
-                top_result = search_results.hybrid_results[0]
-                entity_type = top_result.metadata.get("type", "")
-                
-                if entity_type == "Disease":
-                    recommendations.append(f"深入了解{top_result.metadata.get('name', '')}疾病")
-                elif entity_type == "Treatment":
-                    recommendations.append(f"详细了解{top_result.metadata.get('name', '')}治疗方法")
-                elif entity_type == "Drug":
-                    recommendations.append(f"查看{top_result.metadata.get('name', '')}药物信息")
-            
-            # 限制推荐数量
-            return recommendations[:5]
+            return {
+                'intent': intent_result,
+                'entities': entities,
+                'relationships': relationships,
+                'query': query
+            }
             
         except Exception as e:
-            logger.error(f"生成推荐失败: {e}")
-            return ["探索相关医学知识"]
-    
-    def search_with_custom_weights(self, query: str, cosine_weight: float = 0.7, 
-                                  euclidean_weight: float = 0.3, 
-                                  limit: int = 10) -> HybridSearchResult:
-        """使用自定义权重进行混合检索"""
-        # 临时设置权重
-        original_cosine_weight = self.cosine_weight
-        original_euclidean_weight = self.euclidean_weight
-        
-        self.cosine_weight = cosine_weight
-        self.euclidean_weight = euclidean_weight
-        
-        try:
-            result = self.search_hybrid(query, limit)
-            return result
-        finally:
-            # 恢复原始权重
-            self.cosine_weight = original_cosine_weight
-            self.euclidean_weight = original_euclidean_weight
-    
-    def compare_distance_metrics(self, query: str, limit: int = 5) -> Dict[str, Any]:
-        """比较不同距离度量的检索结果"""
-        logger.info(f"开始比较距离度量: {query}")
-        
-        # 获取不同度量的结果
-        cosine_results = self.search_by_cosine(query, limit)
-        euclidean_results = self.search_by_euclidean(query, limit)
-        hybrid_result = self.search_hybrid(query, limit)
-        
-        # 分析结果差异
-        cosine_ids = set(r.id for r in cosine_results)
-        euclidean_ids = set(r.id for r in euclidean_results)
-        hybrid_ids = set(r.id for r in hybrid_result.hybrid_results)
-        
-        comparison = {
-            "query": query,
-            "cosine_results": cosine_results,
-            "euclidean_results": euclidean_results,
-            "hybrid_results": hybrid_result.hybrid_results,
-            "analysis": {
-                "cosine_only": list(cosine_ids - euclidean_ids),
-                "euclidean_only": list(euclidean_ids - cosine_ids),
-                "common_results": list(cosine_ids & euclidean_ids),
-                "hybrid_unique": list(hybrid_ids - (cosine_ids | euclidean_ids)),
-                "overlap_rate": len(cosine_ids & euclidean_ids) / max(len(cosine_ids | euclidean_ids), 1)
-            },
-            "statistics": hybrid_result.statistics
-        }
-        
-        logger.info(f"距离度量比较完成: 重叠率 {comparison['analysis']['overlap_rate']:.2%}")
-        
-        return comparison
+            logger.error(f"意图感知图谱搜索失败: {e}")
+            return {
+                'intent': None,
+                'entities': [],
+                'relationships': [],
+                'query': query,
+                'error': str(e)
+            }
     
     def get_entity_relationships(self, entity_name: str, limit: int = 10) -> Dict[str, Any]:
         """获取实体的关系网络"""
         try:
-            # 查询实体的所有关系
-            relationships = self.vector_store.graph.run("""
+            # 直接使用Neo4j图谱查询实体关系
+            relationships = self.graph.run("""
                 MATCH (e:Entity {name: $entity_name})-[r:RELATION]-(related:Entity)
                 RETURN e.name as entity,
                        type(r) as relation_type,
@@ -505,21 +486,21 @@ class Neo4jRetrievalService:
         """获取知识图谱摘要"""
         try:
             # 获取实体类型分布
-            entity_types = self.vector_store.graph.run("""
+            entity_types = self.graph.run("""
                 MATCH (n:Entity)
                 RETURN n.type as type, count(n) as count
                 ORDER BY count DESC
             """).data()
             
             # 获取关系类型分布
-            relation_types = self.vector_store.graph.run("""
+            relation_types = self.graph.run("""
                 MATCH ()-[r:RELATION]-()
                 RETURN r.type as type, count(r) as count
                 ORDER BY count DESC
             """).data()
             
             # 获取连接度最高的实体
-            top_connected = self.vector_store.graph.run("""
+            top_connected = self.graph.run("""
                 MATCH (n:Entity)-[r:RELATION]-()
                 RETURN n.name as entity, n.type as type, count(r) as connections
                 ORDER BY connections DESC

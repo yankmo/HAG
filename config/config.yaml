@@ -14,6 +14,11 @@ ollama:
   default_model: "gemma3:4b"
   embedding_model: "bge-m3:latest"
   timeout: 30
+  available_models:
+    - "gemma3:4b"
+    - "llama3:8b"
+    - "qwen2:7b"
+    - "bge-m3:latest"
 
 # Weaviate向量数据库配置
 weaviate:

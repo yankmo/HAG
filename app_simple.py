@@ -18,20 +18,23 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # 导入配置管理器
 from config import get_config
-from src.services.llm_service import OllamaLLMService as SimpleOllamaLLM
-from src.services.embedding_service import OllamaEmbeddingService as OllamaEmbeddingClient
+from src.services import SimpleOllamaLLM, OllamaEmbeddingClient
 from src.services.retrieval_service import RetrievalService
 
 # 尝试导入真实的RAG系统组件
 REAL_RAG_AVAILABLE = True
 try:
-    # 使用新的RetrievalService
+    # 使用新的架构组件
+    from src.services.retrieval_service import RetrievalService
+    from src.services.neo4j_retrieval_service import GraphRetrievalService
+    from src.services.hybrid_retrieval_service import HybridRetrievalService
+    from src.services.rag_pipeline import RAGPipeline
     if 'import_logged' not in st.session_state:
-        logger.info("新的检索服务组件导入成功")
+        logger.info("新的混合检索架构组件导入成功")
         st.session_state.import_logged = True
 except ImportError as e:
     REAL_RAG_AVAILABLE = False
-    logger.warning(f"检索服务组件导入失败: {e}")
+    logger.warning(f"混合检索架构组件导入失败: {e}")
 
 # 尝试导入简化的RAG组件（避免Weaviate依赖）
 try:
@@ -47,7 +50,7 @@ except ImportError as e:
     logger.warning(f"简化RAG系统组件导入失败: {e}")
 
 if REAL_RAG_AVAILABLE and 'system_type_logged' not in st.session_state:
-    logger.info("使用新的检索服务进行演示")
+    logger.info("使用新的混合检索架构进行演示")
     st.session_state.system_type_logged = True
 elif SIMPLE_RAG_AVAILABLE and 'system_type_logged' not in st.session_state:
     logger.info("使用简化RAG系统进行演示")
@@ -114,37 +117,70 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 class NewRAGSystem:
-    """使用新的RetrievalService的RAG系统"""
+    """使用新的混合检索架构的RAG系统"""
     
     def __init__(self):
-        """初始化新的RAG系统"""
-        self.retrieval_service = None
+        """初始化新的混合RAG系统"""
+        self.document_service = None
+        self.graph_service = None
+        self.hybrid_service = None
+        self.rag_pipeline = None
+        self.llm_service = None
         self.initialized = False
         
         try:
             if REAL_RAG_AVAILABLE:
-                # 初始化RetrievalService
-                self.retrieval_service = RetrievalService()
+                # 初始化LLM服务
+                self.llm_service = SimpleOllamaLLM()
+                
+                # 初始化文档检索服务 (Weaviate)
+                self.document_service = RetrievalService()
+                
+                # 初始化图谱检索服务 (Neo4j)
+                config = get_config()
+                self.graph_service = GraphRetrievalService(config.neo4j)
+                
+                # 初始化混合检索服务
+                self.hybrid_service = HybridRetrievalService(
+                    document_retrieval_service=self.document_service,
+                    graph_retrieval_service=self.graph_service,
+                    doc_weight=0.6,
+                    graph_weight=0.4
+                )
+                
+                # 初始化RAG管道
+                self.rag_pipeline = RAGPipeline(
+                    hybrid_retrieval_service=self.hybrid_service,
+                    llm_service=self.llm_service,
+                    max_context_length=4000,
+                    temperature=0.7
+                )
+                
                 self.initialized = True
-                logger.info("新的RAG系统初始化成功")
+                logger.info("新的混合RAG系统初始化成功")
             else:
-                logger.warning("新的RAG系统不可用")
+                logger.warning("新的混合RAG系统不可用")
         except Exception as e:
-            logger.error(f"新的RAG系统初始化失败: {e}")
+            logger.error(f"新的混合RAG系统初始化失败: {e}")
             self.initialized = False
     
     def get_stats(self):
         """获取系统统计信息"""
-        if self.initialized and self.retrieval_service:
+        if self.initialized and self.hybrid_service:
             try:
-                # 获取统计信息
-                stats = self.retrieval_service.get_stats()
+                # 获取混合服务统计信息
+                stats = self.hybrid_service.get_stats()
+                doc_stats = stats.get('document_service', {})
+                graph_stats = stats.get('graph_service', {})
+                
                 return {
-                    "neo4j_nodes": stats.get("neo4j_nodes", 0),
-                    "neo4j_relationships": stats.get("neo4j_relationships", 0),
-                    "weaviate_entities": stats.get("weaviate_entities", 0),
-                    "weaviate_relations": stats.get("weaviate_relations", 0),
-                    "status": "新版本"
+                    "neo4j_nodes": graph_stats.get("total_nodes", 0),
+                    "neo4j_relationships": graph_stats.get("total_relationships", 0),
+                    "weaviate_entities": doc_stats.get("total_entities", 0),
+                    "weaviate_relations": doc_stats.get("total_relations", 0),
+                    "status": "混合架构",
+                    "doc_weight": stats.get('weights', {}).get('document_weight', 0.6),
+                    "graph_weight": stats.get('weights', {}).get('graph_weight', 0.4)
                 }
             except Exception as e:
                 logger.error(f"获取统计信息失败: {e}")
@@ -165,85 +201,106 @@ class NewRAGSystem:
     
     def search_knowledge(self, query, **kwargs):
         """搜索知识"""
-        if self.initialized and self.retrieval_service:
+        if self.initialized and self.hybrid_service:
             try:
                 import time
                 start_time = time.time()
                 
-                # 使用新的检索服务进行搜索
-                hybrid_result = self.retrieval_service.search_hybrid(query, limit=5)
+                # 使用混合检索服务进行搜索
+                hybrid_result = self.hybrid_service.search_hybrid(query, top_k=10)
                 
                 retrieval_time = time.time() - start_time
-                logger.info(f"新检索服务完成，耗时 {retrieval_time:.2f}s")
+                logger.info(f"混合检索完成，耗时 {retrieval_time:.2f}s")
                 
                 # 转换结果格式以兼容现有的显示代码
                 entities = []
                 relations = []
                 
-                # 处理混合检索结果
-                for result in hybrid_result.hybrid_results:
-                    # 计算相似度（从SearchResult对象获取）
-                    similarity = result.score if hasattr(result, 'score') else None
-                    distance = result.distance if hasattr(result, 'distance') else None
+                # 处理文档结果
+                for doc in hybrid_result.documents:
+                    entity = {
+                        'name': doc.get('metadata', {}).get('title', 'Document'),
+                        'type': 'document',
+                        'description': doc['content'][:200] + "..." if len(doc['content']) > 200 else doc['content'],
+                        'similarity': f"{doc['score']:.3f}",
+                        'distance': 1 - doc['score'],  # 转换为距离
+                        'source_text': doc['content'],
+                        'metadata': doc.get('metadata', {}),
+                        'source': 'weaviate'
+                    }
+                    entities.append(entity)
+                
+                # 处理实体结果
+                for entity_data in hybrid_result.entities:
+                    # 正确提取描述和标签信息
+                    description = entity_data.get('description', '')
+                    if not description:
+                        # 如果没有描述，尝试从properties中获取
+                        properties = entity_data.get('properties', {})
+                        description = properties.get('description', 'N/A')
                     
-                    # 从metadata获取信息
-                    metadata = result.metadata if hasattr(result, 'metadata') else {}
-                    result_type = metadata.get('type', '')
-                    name = metadata.get('name', 'N/A')
-                    description = metadata.get('description', 'N/A')
-                    
-                    # 记录调试信息
-                    logger.debug(f"处理结果: type={result_type}, name={name}, similarity={similarity}")
-                    
-                    # 检查是否为关系类型
-                    if (result_type == 'relation' and 
-                        metadata.get('start_entity') and 
-                        metadata.get('end_entity')):
-                        # 这是真正的关系
-                        relation = {
-                            'description': f"{metadata.get('start_entity', 'N/A')} → {metadata.get('relation_type', 'N/A')} → {metadata.get('end_entity', 'N/A')}",
-                            'type': metadata.get('relation_type', 'N/A'),
-                            'start_entity': metadata.get('start_entity', 'N/A'),
-                            'end_entity': metadata.get('end_entity', 'N/A'),
-                            'similarity': f"{similarity:.3f}" if similarity is not None else "N/A"
-                        }
-                        relations.append(relation)
+                    entity = {
+                        'name': entity_data.get('name', 'Unknown'),
+                        'type': entity_data.get('type', 'entity'),
+                        'description': description,
+                        'labels': entity_data.get('labels', []),  # 添加标签字段
+                        'similarity': "N/A",  # 图谱检索没有相似度分数
+                        'distance': "N/A",
+                        'source_text': '',
+                        'metadata': entity_data.get('properties', {}),
+                        'source': 'neo4j'
+                    }
+                    entities.append(entity)
+                
+                # 处理关系结果
+                logger.info(f"处理关系结果，数量: {len(hybrid_result.relationships)}")
+                for i, rel_data in enumerate(hybrid_result.relationships):
+                    logger.info(f"关系 {i}: {rel_data}")
+                    # 保留原始描述，如果没有描述则生成默认格式
+                    original_description = rel_data.get('description', '')
+                    if not original_description or original_description.strip() == '':
+                        description = f"{rel_data.get('source', 'N/A')} → {rel_data.get('type', 'N/A')} → {rel_data.get('target', 'N/A')}"
                     else:
-                        # 默认作为实体处理（包括所有其他类型）
-                        entity = {
-                            'name': name,
-                            'type': result_type if result_type else 'entity',
-                            'description': description,
-                            'similarity': f"{similarity:.3f}" if similarity is not None else "N/A",
-                            'distance': distance,
-                            'source_text': result.content if hasattr(result, 'content') else '',
-                            'metadata': metadata
-                        }
-                        entities.append(entity)
+                        description = original_description
+                    
+                    relation = {
+                        'description': description,
+                        'type': rel_data.get('type', 'N/A'),
+                        'start_entity': rel_data.get('source', 'N/A'),
+                        'end_entity': rel_data.get('target', 'N/A'),
+                        'similarity': "N/A",
+                        'distance': "N/A",
+                        'metadata': rel_data.get('properties', {}),
+                        'source': 'neo4j'
+                    }
+                    logger.info(f"格式化后的关系: {relation}")
+                    relations.append(relation)
                 
                 return {
                     "query": query,
                     "search_results": {
                         "vector_search": {
-                            "entities": entities,
-                            "relations": relations  # 只包含真正的关系
+                            "entities": [e for e in entities if e['source'] == 'weaviate'],
+                            "relations": []  # 文档检索不返回关系
                         },
                         "graph_search": {
-                            "nodes": [],
-                            "relationships": [],
-                            "total_nodes": 0,
-                            "total_relationships": 0
+                            "nodes": [e for e in entities if e['source'] == 'neo4j'],
+                            "relationships": relations,
+                            "total_nodes": len([e for e in entities if e['source'] == 'neo4j']),
+                            "total_relationships": len(relations)
                         },
                         "hybrid_search": {
                             "search_stats": {
-                                "vector_entities": len(entities),
-                                "vector_relations": len(relations),
-                                "graph_nodes": 0,
-                                "graph_relationships": 0
+                                "vector_entities": len([e for e in entities if e['source'] == 'weaviate']),
+                                "vector_relations": 0,
+                                "graph_nodes": len([e for e in entities if e['source'] == 'neo4j']),
+                                "graph_relationships": len(relations),
+                                "combined_score": hybrid_result.combined_score
                             }
                         }
                     },
-                    "retrieval_time": retrieval_time
+                    "retrieval_time": retrieval_time,
+                    "hybrid_metadata": hybrid_result.metadata
                 }
                 
             except Exception as e:
@@ -254,25 +311,44 @@ class NewRAGSystem:
                     "search_results": {}
                 }
         else:
-            logger.error("新RAG系统未初始化")
+            logger.error("混合RAG系统未初始化")
             return {
-                "error": "新RAG系统未初始化",
+                "error": "混合RAG系统未初始化",
                 "query": query,
                 "search_results": {}
             }
     
     def generate_answer(self, query, search_results=None):
         """生成答案"""
-        if self.initialized and self.retrieval_service:
+        if self.initialized and self.rag_pipeline:
             try:
-                # 使用检索服务生成答案
-                answer = self.retrieval_service.generate_answer(query, search_results)
-                return answer
+                # 使用RAG管道生成答案
+                rag_response = self.rag_pipeline.generate_answer(
+                    question=query,
+                    top_k=10,
+                    include_sources=True
+                )
+                
+                # 格式化答案
+                answer_parts = [rag_response.answer]
+                
+                if rag_response.sources:
+                    answer_parts.append("\n\n**参考来源:**")
+                    for i, source in enumerate(rag_response.sources[:5], 1):
+                        if source['type'] == 'document':
+                            answer_parts.append(f"{i}. 文档: {source['content']}")
+                        elif source['type'] == 'entity':
+                            answer_parts.append(f"{i}. 实体: {source['name']} ({source['entity_type']})")
+                        elif source['type'] == 'relationship':
+                            answer_parts.append(f"{i}. 关系: {source['source_entity']} → {source['relation_type']} → {source['target_entity']}")
+                
+                return "\n".join(answer_parts)
+                
             except Exception as e:
                 logger.error(f"生成答案失败: {e}")
                 return f"生成答案时出现错误: {e}"
         else:
-            return "新RAG系统未初始化，无法生成答案"
+            return "混合RAG系统未初始化，无法生成答案"
 
 
 class SimpleRAGSystem:
@@ -297,13 +373,14 @@ class SimpleRAGSystem:
                 
                 # 尝试初始化向量处理器（可选）
                 try:
-                    from src.knowledge.vector_storage import WeaviateVectorStore, VectorKnowledgeProcessor
+                    from src.knowledge.vector_storage import WeaviateVectorStore
                     embedding_client = OllamaEmbeddingClient()
                     vector_store = WeaviateVectorStore()
-                    self.vector_processor = VectorKnowledgeProcessor(embedding_client, vector_store)
-                    logger.info("向量处理器初始化成功")
+                    # 暂时禁用向量处理器，因为VectorKnowledgeProcessor类不存在
+                    self.vector_processor = None
+                    logger.info("向量存储初始化成功，但向量处理器暂时禁用")
                 except Exception as ve:
-                    logger.warning(f"向量处理器初始化失败，将仅使用图谱检索: {ve}")
+                    logger.warning(f"向量存储初始化失败，将仅使用图谱检索: {ve}")
                     self.vector_processor = None
                 
                 self.initialized = True
@@ -783,72 +860,239 @@ def display_detailed_results(retrieval_results: Dict[str, Any]):
             relations = vector_search.get('relations', [])
             
             if entities:
-                st.write("**实体结果:**")
-                for i, entity in enumerate(entities[:5], 1):
+                st.markdown("### 🎯 **实体结果**")
+                st.write("")
+                
+                for i, entity in enumerate(entities, 1):  # 显示所有实体，不限制为5个
                     similarity = entity.get('similarity', 'N/A')
                     name = entity.get('name', 'N/A')
                     description = entity.get('description', 'N/A')
+                    distance = entity.get('distance', 'N/A')
+                    metadata = entity.get('metadata', {})
                     
-                    # 使用容器而不是嵌套expander
+                    # 创建美观的实体卡片
                     with st.container():
-                        st.markdown(f"**实体 {i}: {name}**")
-                        st.write(f"相似度: {similarity}")
-                        st.write(f"描述: {description}")
-                        st.divider()
+                        st.markdown(f"#### 🎯 **实体 {i}: {name}**")
+                        
+                        # 描述显示
+                        if description and description != 'N/A':
+                            st.markdown(f"**📝 描述**: {description}")
+                        else:
+                            st.markdown("**📝 描述**: *暂无描述*")
+                        
+                        # 显示详细的距离信息
+                        st.markdown("**📊 相似度指标**:")
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            if similarity != 'N/A':
+                                st.metric("综合相似度", f"{similarity}")
+                            else:
+                                st.metric("综合相似度", "N/A")
+                        with col2:
+                            # 从metadata中获取余弦相似度
+                            cosine_similarity = metadata.get('cosine_similarity', 'N/A')
+                            if cosine_similarity == 'N/A' and distance != 'N/A':
+                                # 如果没有直接的余弦相似度，尝试从distance计算
+                                try:
+                                    cosine_similarity = f"{1 - float(distance):.3f}"
+                                except:
+                                    cosine_similarity = 'N/A'
+                            elif isinstance(cosine_similarity, (int, float)):
+                                cosine_similarity = f"{cosine_similarity:.3f}"
+                            st.metric("余弦相似度", cosine_similarity)
+                        with col3:
+                            # 从metadata中获取欧氏距离
+                            euclidean_distance = metadata.get('euclidean_distance', 'N/A')
+                            if isinstance(euclidean_distance, (int, float)):
+                                euclidean_distance = f"{euclidean_distance:.3f}"
+                                st.metric("欧氏距离", euclidean_distance)
+                            else:
+                                st.metric("欧氏距离", "N/A")
+                        
+                        # 显示其他metadata信息
+                        other_metadata = {k: v for k, v in metadata.items() 
+                                        if k not in ['cosine_similarity', 'euclidean_distance']}
+                        if other_metadata:
+                            st.markdown("**🔧 其他详细信息**:")
+                            for key, value in other_metadata.items():
+                                st.write(f"• **{key}**: {value}")
+                        
+                        st.markdown("---")
             
             if relations:
-                st.write("**关系结果:**")
-                for i, relation in enumerate(relations[:5], 1):
+                st.markdown("### 🔗 **关系结果**")
+                st.write("")
+                
+                for i, relation in enumerate(relations, 1):  # 显示所有关系，不限制为5个
                     description = relation.get('description', 'N/A')
+                    similarity = relation.get('similarity', 'N/A')
+                    distance = relation.get('distance', 'N/A')
+                    metadata = relation.get('metadata', {})
+                    
+                    # 创建美观的关系卡片
                     with st.container():
-                        st.markdown(f"**关系 {i}**")
-                        st.write(f"描述: {description}")
-                        st.divider()
+                        st.markdown(f"#### 🔗 **关系 {i}**")
+                        
+                        # 关系描述
+                        if description and description != 'N/A':
+                            st.markdown(f"**📝 描述**: {description}")
+                        else:
+                            st.markdown("**📝 描述**: *暂无描述*")
+                        
+                        # 显示详细的距离信息
+                        if similarity != 'N/A' or distance != 'N/A' or metadata:
+                            st.markdown("**📊 相似度指标**:")
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                if similarity != 'N/A':
+                                    st.metric("综合相似度", f"{similarity}")
+                                else:
+                                    st.metric("综合相似度", "N/A")
+                            with col2:
+                                # 从metadata中获取余弦相似度
+                                cosine_similarity = metadata.get('cosine_similarity', 'N/A')
+                                if cosine_similarity == 'N/A' and distance != 'N/A':
+                                    try:
+                                        cosine_similarity = f"{1 - float(distance):.3f}"
+                                    except:
+                                        cosine_similarity = 'N/A'
+                                elif isinstance(cosine_similarity, (int, float)):
+                                    cosine_similarity = f"{cosine_similarity:.3f}"
+                                st.metric("余弦相似度", cosine_similarity)
+                            with col3:
+                                # 从metadata中获取欧氏距离
+                                euclidean_distance = metadata.get('euclidean_distance', 'N/A')
+                                if isinstance(euclidean_distance, (int, float)):
+                                    euclidean_distance = f"{euclidean_distance:.3f}"
+                                    st.metric("欧氏距离", euclidean_distance)
+                                else:
+                                    st.metric("欧氏距离", "N/A")
+                        
+                        st.markdown("---")
             
             if not entities and not relations:
-                st.info("未找到相关向量结果")
+                st.info("🔍 未找到相关向量结果")
         
         with tab2:
+            # 获取图谱检索结果
             nodes = graph_search.get('nodes', [])
             relationships = graph_search.get('relationships', [])
             
+            # 显示节点结果
             if nodes:
-                st.write("**节点结果:**")
-                for i, node in enumerate(nodes[:10], 1):  # 显示更多节点
+                st.markdown("### 🔍 节点结果")
+                st.write("")
+                
+                for i, node in enumerate(nodes, 1):
+                    # 获取节点信息
                     name = node.get('name', 'N/A')
                     description = node.get('description', 'N/A')
                     labels = node.get('labels', [])
+                    node_type = node.get('type', 'N/A')
+                    distance = node.get('distance', 'N/A')
+                    metadata = node.get('metadata', {})
+                    similarity = node.get('similarity', 'N/A')
+                    source_text = node.get('source_text', '')
+                    source = node.get('source', 'neo4j')
                     
-                    with st.container():
-                        st.markdown(f"**节点 {i}: {name}**")
-                        st.write(f"标签: {', '.join(labels)}")
-                        st.write(f"描述: {description}")
-                        # 显示其他属性
-                        other_props = {k: v for k, v in node.items() 
-                                     if k not in ['name', 'description', 'labels']}
-                        if other_props:
-                            st.write("其他属性:")
-                            for key, value in other_props.items():
-                                st.write(f"  - {key}: {value}")
-                        st.divider()
+                    # 显示节点信息
+                    st.markdown(f"📍 **节点 {i}: {name}**")
+                    
+                    # 标签
+                    if labels and len(labels) > 0:
+                        label_str = ', '.join(labels)
+                        st.write(f"🏷️ 标签: {label_str}")
+                    else:
+                        st.write("🏷️ 标签: 无标签")
+                    
+                    st.write("")
+                    
+                    # 描述
+                    if description and description != 'N/A':
+                        st.write(f"📝 描述: {description}")
+                    else:
+                        st.write("📝 描述: 暂无描述")
+                    
+                    st.write("")
+                    
+                    # 其他属性
+                    st.write("🔧 其他属性:")
+                    st.write("")
+                    st.write(f"type: {node_type}")
+                    st.write("")
+                    st.write(f"distance: {distance}")
+                    st.write("")
+                    st.write(f"metadata: {metadata}")
+                    st.write("")
+                    st.write(f"similarity: {similarity}")
+                    st.write("")
+                    st.write(f"source_text: {source_text}")
+                    st.write("")
+                    st.write(f"数据源: {source}")
+                    st.write("")
+                    
+                    st.markdown("---")
             
+            # 显示关系结果
             if relationships:
-                st.write("**关系结果:**")
-                for i, rel in enumerate(relationships[:10], 1):  # 显示更多关系
+                st.markdown("### 🔗 关系结果")
+                st.write("")
+                
+                for i, rel in enumerate(relationships, 1):
+                    # 获取关系信息
                     rel_type = rel.get('type', 'N/A')
-                    start_node = rel.get('start_node', {}).get('name', 'N/A')
-                    end_node = rel.get('end_node', {}).get('name', 'N/A')
+                    start_entity = rel.get('start_entity', 'N/A')
+                    end_entity = rel.get('end_entity', 'N/A')
+                    description = rel.get('description', 'N/A')
                     
+                    # 创建美观的关系卡片
                     with st.container():
-                        st.markdown(f"**关系 {i}: {rel_type}**")
-                        st.write(f"起始节点: {start_node}")
-                        st.write(f"结束节点: {end_node}")
-                        if rel.get('properties'):
-                            st.write(f"属性: {rel['properties']}")
-                        st.divider()
+                        # 关系标题和类型
+                        st.markdown(f"#### 🔗 **关系 {i}: `{rel_type}`**")
+                        
+                        # 关系路径可视化
+                        st.markdown(f"**📍 关系路径**: `{start_node}` ➡️ **{rel_type}** ➡️ `{end_node}`")
+                        
+                        # 详细信息
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.markdown(f"**🎯 起始节点**: `{start_node}`")
+                        with col2:
+                            st.markdown(f"**🎯 结束节点**: `{end_node}`")
+                        
+                        # 关系描述
+                        if description and description != 'N/A':
+                            st.markdown(f"**📝 描述**: {description}")
+                        else:
+                            st.markdown("**📝 描述**: *暂无描述*")
+                        
+                        # 其他属性
+                        other_props = {k: v for k, v in rel.items() 
+                                     if k not in ['type', 'start_entity', 'end_entity', 'description']}
+                        if other_props:
+                            st.markdown("**🔧 其他属性**:")
+                            cols = st.columns(3)
+                            prop_items = list(other_props.items())
+                            for idx, (key, value) in enumerate(prop_items):
+                                col_idx = idx % 3
+                                with cols[col_idx]:
+                                    if key in ['similarity', 'distance']:
+                                        if value != 'N/A':
+                                            st.write(f"**{key}**: `{value}`")
+                                        else:
+                                            st.write(f"**{key}**: *N/A*")
+                                    elif key == 'source':
+                                        st.write(f"**数据源**: `{value}`")
+                                    elif key == 'metadata' and value:
+                                        st.write(f"**元数据**: {value}")
+                                    else:
+                                        st.write(f"**{key}**: {value}")
+                        
+                        st.markdown("---")
             
+            # 如果没有结果
             if not nodes and not relationships:
-                st.info("未找到相关图谱结果")
+                st.info("🔍 未找到相关图谱结果")
         
         with tab3:
             search_stats = hybrid_search.get('search_stats', {})
@@ -875,6 +1119,57 @@ def display_detailed_results(retrieval_results: Dict[str, Any]):
                         st.metric("检索耗时", f"{retrieval_time:.3f}s")
                     else:
                         st.metric("检索耗时", "N/A")
+                
+                # 添加距离度量详细信息
+                st.write("---")
+                st.write("**距离度量详情:**")
+                
+                # 显示混合检索的权重配置
+                st.info("🔧 **混合检索配置**: 余弦相似度权重 70% + 欧氏距离权重 30%")
+                
+                # 分析实体结果的距离分布
+                entities = vector_search.get('entities', [])
+                if entities:
+                    st.write("**实体距离分布:**")
+                    
+                    cosine_values = []
+                    euclidean_values = []
+                    
+                    for entity in entities:
+                        metadata = entity.get('metadata', {})
+                        cosine_sim = metadata.get('cosine_similarity')
+                        euclidean_dist = metadata.get('euclidean_distance')
+                        
+                        if isinstance(cosine_sim, (int, float)):
+                            cosine_values.append(cosine_sim)
+                        if isinstance(euclidean_dist, (int, float)):
+                            euclidean_values.append(euclidean_dist)
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if cosine_values:
+                            avg_cosine = sum(cosine_values) / len(cosine_values)
+                            max_cosine = max(cosine_values)
+                            min_cosine = min(cosine_values)
+                            st.write("**余弦相似度统计:**")
+                            st.write(f"- 平均值: {avg_cosine:.3f}")
+                            st.write(f"- 最大值: {max_cosine:.3f}")
+                            st.write(f"- 最小值: {min_cosine:.3f}")
+                        else:
+                            st.write("**余弦相似度**: 无数据")
+                    
+                    with col2:
+                        if euclidean_values:
+                            avg_euclidean = sum(euclidean_values) / len(euclidean_values)
+                            max_euclidean = max(euclidean_values)
+                            min_euclidean = min(euclidean_values)
+                            st.write("**欧氏距离统计:**")
+                            st.write(f"- 平均值: {avg_euclidean:.3f}")
+                            st.write(f"- 最大值: {max_euclidean:.3f}")
+                            st.write(f"- 最小值: {min_euclidean:.3f}")
+                        else:
+                            st.write("**欧氏距离**: 无数据")
+                
             else:
                 st.info("暂无混合检索统计信息")
 
@@ -961,10 +1256,13 @@ def display_knowledge_sources(retrieval_results: Dict[str, Any]):
 
 def check_service_status():
     """检查各服务状态"""
+    from config.settings import ConfigManager
+    config = ConfigManager()
+    
     services = {
-        "Ollama": "http://localhost:11434/api/tags",
-        "Neo4j": "http://localhost:7474",  # Neo4j Browser端口
-        "Weaviate": "http://localhost:8080/v1/meta"
+        "Ollama": config.ollama.api_tags_url,
+        "Neo4j": "http://localhost:7474",  # Neo4j Browser端口（固定）
+        "Weaviate": config.weaviate.meta_url
     }
     
     status = {}
@@ -1074,6 +1372,9 @@ def format_retrieval_context(retrieval_results: Dict[str, Any]) -> str:
 
 def main():
     """主函数"""
+    # 获取配置
+    config = get_config()
+    
     # 页面标题
     st.markdown('<h1 class="main-header">🏥 医疗知识RAG系统</h1>', unsafe_allow_html=True)
     
@@ -1145,10 +1446,21 @@ def main():
         
         # 模型设置
         st.header("🤖 模型设置")
+        # 从配置获取可用模型列表，如果配置中没有定义则使用默认列表
+        available_models = getattr(config.ollama, 'available_models', ["gemma3:4b", "llama3:8b", "qwen2:7b"])
+        default_model = config.ollama.default_model
+        
+        # 确保默认模型在可用模型列表中
+        if default_model not in available_models:
+            available_models.insert(0, default_model)
+        
+        # 设置默认选中的模型索引
+        default_index = available_models.index(default_model) if default_model in available_models else 0
+        
         model_name = st.selectbox(
             "选择模型",
-            ["gemma3:4b", "llama3:8b", "qwen2:7b"],
-            index=0
+            available_models,
+            index=default_index
         )
         
         st.session_state.temperature = st.slider(
