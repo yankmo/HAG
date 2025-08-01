@@ -11,8 +11,6 @@
 [![Neo4j](https://img.shields.io/badge/Neo4j-5.0+-red.svg)](https://neo4j.com/)
 [![Weaviate](https://img.shields.io/badge/Weaviate-1.20+-orange.svg)](https://weaviate.io/)
 
-[English](README.md) | [中文](README_CN.md)
-
 **Author**: [YankMo](https://github.com/yankmo)
 
 </div>
@@ -26,19 +24,19 @@ HAG (Hybrid Augmented Generation) is an advanced knowledge-enhanced generation f
 ## 📸 Screenshots
 
 ### 1. Web Interface
-![HAG Web Interface](./docs/images/web-interface.png)
+![HAG Web Interface](./docs/images/web.png)
 *Modern Streamlit-powered web interface with real-time system monitoring and chat functionality*
 
 ### 2. Retrieval Process
-![HAG Retrieval Process](./docs/images/retrieval-process.png)
+![HAG Retrieval Process](./docs/images/document.png)
 *Visual demonstration of hybrid retrieval workflow combining vector and graph databases*
 
 ### 3. Retrieval Results
-![HAG Retrieval Results](./docs/images/retrieval-results.png)
+![HAG Retrieval Results](./docs/images/huida.png)
 *Example of comprehensive retrieval results showing documents, entities, and relationships*
 
 ### 4. Storage Architecture
-![HAG Storage Architecture](./docs/images/storage-architecture.png)
+![HAG Storage Architecture](./docs/images/neo4j.png)
 *Data storage structure in Weaviate vector database and Neo4j knowledge graph*
 
 ## ✨ Core Features
