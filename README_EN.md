@@ -10,6 +10,7 @@
 [![LangChain](https://img.shields.io/badge/LangChain-0.1.0-green.svg)](https://langchain.com/)
 [![Neo4j](https://img.shields.io/badge/Neo4j-5.0+-red.svg)](https://neo4j.com/)
 [![Weaviate](https://img.shields.io/badge/Weaviate-1.20+-orange.svg)](https://weaviate.io/)
+
 [English](README_EN.md) | [中文](README.md)
 
 **Author**: [YankMo](https://github.com/yankmo)
