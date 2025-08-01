@@ -11,6 +11,8 @@
 [![Neo4j](https://img.shields.io/badge/Neo4j-5.0+-red.svg)](https://neo4j.com/)
 [![Weaviate](https://img.shields.io/badge/Weaviate-1.20+-orange.svg)](https://weaviate.io/)
 
+[English](README_EN.md) | [中文](README.md)
+
 **作者**: [YankMo](https://github.com/yankmo)
 
 </div>
