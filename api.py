@@ -34,11 +34,24 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 @dataclass
+class RetrievalStep:
+    """检索步骤"""
+    step_name: str
+    step_description: str
+    start_time: float
+    end_time: float
+    duration: float
+    status: str  # "success", "error", "warning"
+    result_count: int
+    details: Dict[str, Any]
+
+@dataclass
 class IntegratedResponse:
     """整合响应结果"""
     answer: str
     sources: Dict[str, Any]
     metadata: Dict[str, Any]
+    retrieval_process: List[RetrievalStep]
 
 class HAGIntegratedAPI:
     """HAG整合API - 使用LangChain Runnable模式"""
@@ -265,7 +278,7 @@ class HAGIntegratedAPI:
     
     def query(self, question: str) -> IntegratedResponse:
         """
-        主要查询接口 - 整合所有功能
+        主要查询接口 - 整合所有功能，记录详细检索过程
         
         Args:
             question: 用户问题
@@ -273,19 +286,224 @@ class HAGIntegratedAPI:
         Returns:
             IntegratedResponse: 整合响应结果
         """
+        import time
+        
+        retrieval_steps = []
+        
         try:
             logger.info(f"开始处理查询: {question}")
             
-            # 使用LangChain Runnable管道处理查询
-            answer = self.runnable_chain.invoke(question)
+            # 步骤1: 问题分析和向量化
+            step1_start = time.time()
+            try:
+                query_vector = self.embedding_service.embed_text(question)
+                step1_end = time.time()
+                retrieval_steps.append(RetrievalStep(
+                    step_name="问题向量化",
+                    step_description="将用户问题转换为向量表示",
+                    start_time=step1_start,
+                    end_time=step1_end,
+                    duration=step1_end - step1_start,
+                    status="success",
+                    result_count=1,
+                    details={"vector_dimension": len(query_vector) if query_vector else 0}
+                ))
+            except Exception as e:
+                step1_end = time.time()
+                retrieval_steps.append(RetrievalStep(
+                    step_name="问题向量化",
+                    step_description="将用户问题转换为向量表示",
+                    start_time=step1_start,
+                    end_time=step1_end,
+                    duration=step1_end - step1_start,
+                    status="error",
+                    result_count=0,
+                    details={"error": str(e)}
+                ))
             
-            # 获取详细的检索结果用于sources (使用doc_top_k=5确保Top5文档)
-            hybrid_result = self.hybrid_service.search_hybrid(question, doc_top_k=5, graph_top_k=4)
+            # 步骤2: 文档检索 (Weaviate)
+            step2_start = time.time()
+            try:
+                hybrid_result = self.retrieval_service.search_hybrid(question, limit=5)
+                documents = hybrid_result.hybrid_results[:5]
+                step2_end = time.time()
+                retrieval_steps.append(RetrievalStep(
+                    step_name="文档检索",
+                    step_description="从Weaviate向量数据库检索相关文档",
+                    start_time=step2_start,
+                    end_time=step2_end,
+                    duration=step2_end - step2_start,
+                    status="success",
+                    result_count=len(documents),
+                    details={
+                        "search_method": "hybrid_cosine_euclidean",
+                        "top_scores": [doc.score for doc in documents[:3]] if documents else []
+                    }
+                ))
+            except Exception as e:
+                step2_end = time.time()
+                documents = []
+                retrieval_steps.append(RetrievalStep(
+                    step_name="文档检索",
+                    step_description="从Weaviate向量数据库检索相关文档",
+                    start_time=step2_start,
+                    end_time=step2_end,
+                    duration=step2_end - step2_start,
+                    status="error",
+                    result_count=0,
+                    details={"error": str(e)}
+                ))
+            
+            # 步骤3: 实体检索 (Neo4j)
+            step3_start = time.time()
+            try:
+                entities = self.graph_service.search_entities_by_name(question, limit=2)
+                step3_end = time.time()
+                retrieval_steps.append(RetrievalStep(
+                    step_name="实体检索",
+                    step_description="从Neo4j图数据库检索相关实体",
+                    start_time=step3_start,
+                    end_time=step3_end,
+                    duration=step3_end - step3_start,
+                    status="success",
+                    result_count=len(entities),
+                    details={
+                        "entity_types": [entity.get('type', '') for entity in entities] if entities else []
+                    }
+                ))
+            except Exception as e:
+                step3_end = time.time()
+                entities = []
+                retrieval_steps.append(RetrievalStep(
+                    step_name="实体检索",
+                    step_description="从Neo4j图数据库检索相关实体",
+                    start_time=step3_start,
+                    end_time=step3_end,
+                    duration=step3_end - step3_start,
+                    status="error",
+                    result_count=0,
+                    details={"error": str(e)}
+                ))
+            
+            # 步骤4: 关系检索 (Neo4j)
+            step4_start = time.time()
+            try:
+                all_relationships = []
+                for entity in entities:
+                    entity_name = entity.get('name', '')
+                    if entity_name:
+                        entity_rels = self.graph_service.get_entity_relationships(entity_name, limit=5)
+                        relationships = entity_rels.get('relationships', [])
+                        all_relationships.extend(relationships)
+                
+                # 去重
+                seen_relations = set()
+                unique_relationships = []
+                for rel in all_relationships:
+                    rel_key = (rel.get('entity', ''), rel.get('relation_type', ''), rel.get('related_entity', ''))
+                    if rel_key not in seen_relations:
+                        seen_relations.add(rel_key)
+                        unique_relationships.append(rel)
+                
+                step4_end = time.time()
+                retrieval_steps.append(RetrievalStep(
+                    step_name="关系检索",
+                    step_description="从Neo4j图数据库检索实体间关系",
+                    start_time=step4_start,
+                    end_time=step4_end,
+                    duration=step4_end - step4_start,
+                    status="success",
+                    result_count=len(unique_relationships),
+                    details={
+                        "relation_types": list(set([rel.get('relation_type', '') for rel in unique_relationships])) if unique_relationships else []
+                    }
+                ))
+            except Exception as e:
+                step4_end = time.time()
+                unique_relationships = []
+                retrieval_steps.append(RetrievalStep(
+                    step_name="关系检索",
+                    step_description="从Neo4j图数据库检索实体间关系",
+                    start_time=step4_start,
+                    end_time=step4_end,
+                    duration=step4_end - step4_start,
+                    status="error",
+                    result_count=0,
+                    details={"error": str(e)}
+                ))
+            
+            # 步骤5: 混合检索结果整合
+            step5_start = time.time()
+            try:
+                hybrid_result = self.hybrid_service.search_hybrid(question, doc_top_k=5, graph_top_k=4)
+                step5_end = time.time()
+                retrieval_steps.append(RetrievalStep(
+                    step_name="混合检索整合",
+                    step_description="整合文档和图谱检索结果",
+                    start_time=step5_start,
+                    end_time=step5_end,
+                    duration=step5_end - step5_start,
+                    status="success",
+                    result_count=len(hybrid_result.documents) + len(hybrid_result.entities) + len(hybrid_result.relationships),
+                    details={
+                        "doc_weight": 0.6,
+                        "graph_weight": 0.4,
+                        "total_documents": len(hybrid_result.documents),
+                        "total_entities": len(hybrid_result.entities),
+                        "total_relationships": len(hybrid_result.relationships)
+                    }
+                ))
+            except Exception as e:
+                step5_end = time.time()
+                hybrid_result = None
+                retrieval_steps.append(RetrievalStep(
+                    step_name="混合检索整合",
+                    step_description="整合文档和图谱检索结果",
+                    start_time=step5_start,
+                    end_time=step5_end,
+                    duration=step5_end - step5_start,
+                    status="error",
+                    result_count=0,
+                    details={"error": str(e)}
+                ))
+            
+            # 步骤6: LLM答案生成
+            step6_start = time.time()
+            try:
+                answer = self.runnable_chain.invoke(question)
+                step6_end = time.time()
+                retrieval_steps.append(RetrievalStep(
+                    step_name="答案生成",
+                    step_description="使用LLM基于检索结果生成答案",
+                    start_time=step6_start,
+                    end_time=step6_end,
+                    duration=step6_end - step6_start,
+                    status="success",
+                    result_count=1,
+                    details={
+                        "model": "gemma3:4b",
+                        "answer_length": len(answer),
+                        "temperature": 0.7
+                    }
+                ))
+            except Exception as e:
+                step6_end = time.time()
+                answer = f"抱歉，生成答案时出现错误: {str(e)}"
+                retrieval_steps.append(RetrievalStep(
+                    step_name="答案生成",
+                    step_description="使用LLM基于检索结果生成答案",
+                    start_time=step6_start,
+                    end_time=step6_end,
+                    duration=step6_end - step6_start,
+                    status="error",
+                    result_count=0,
+                    details={"error": str(e)}
+                ))
             
             # 构建响应
-            response = IntegratedResponse(
-                answer=answer,
-                sources={
+            sources = {"documents": [], "entities": [], "relationships": []}
+            if hybrid_result:
+                sources = {
                     "documents": [
                         {
                             "content": doc["content"][:200] + "...",
@@ -311,15 +529,21 @@ class HAGIntegratedAPI:
                         }
                         for rel in hybrid_result.relationships[:10]
                     ]
-                },
+                }
+            
+            response = IntegratedResponse(
+                answer=answer,
+                sources=sources,
                 metadata={
                     "question": question,
-                    "retrieval_metadata": hybrid_result.metadata,
-                    "processing_method": "langchain_runnable"
-                }
+                    "retrieval_metadata": hybrid_result.metadata if hybrid_result else {},
+                    "processing_method": "langchain_runnable_with_detailed_steps",
+                    "total_processing_time": sum([step.duration for step in retrieval_steps])
+                },
+                retrieval_process=retrieval_steps
             )
             
-            logger.info(f"查询处理完成: 答案长度={len(answer)}")
+            logger.info(f"查询处理完成: 答案长度={len(answer)}, 检索步骤={len(retrieval_steps)}")
             return response
             
         except Exception as e:
@@ -327,7 +551,8 @@ class HAGIntegratedAPI:
             return IntegratedResponse(
                 answer=f"抱歉，处理查询时出现错误: {str(e)}",
                 sources={"documents": [], "entities": [], "relationships": []},
-                metadata={"error": str(e)}
+                metadata={"error": str(e)},
+                retrieval_process=retrieval_steps
             )
     
     def get_system_status(self) -> Dict[str, Any]:

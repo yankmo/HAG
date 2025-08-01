@@ -80,3 +80,27 @@ Thumbs.db
 # 上传文件
 uploads/
 temp/
+
+# Node.js相关
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+
+# 前端构建产物
+frontend/build/
+frontend/dist/
+frontend/.next/
+frontend/out/
+
+# 前端环境变量
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# 前端缓存
+frontend/.cache/
+frontend/coverage/
