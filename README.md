@@ -11,7 +11,7 @@
 [![Neo4j](https://img.shields.io/badge/Neo4j-5.0+-red.svg)](https://neo4j.com/)
 [![Weaviate](https://img.shields.io/badge/Weaviate-1.20+-orange.svg)](https://weaviate.io/)
 
-[English](README.md) | [中文](README_CN.md)
+[English](README_EN.md) | [中文](README.md)
 
 **作者**: [YankMo](https://github.com/yankmo)
 
@@ -85,7 +85,7 @@ HAG（混合增强生成）是一个先进的知识增强生成框架，结合�
 *混合检索工作流程的可视化演示，结合向量数据库和图数据库*
 
 ### 3. 检索结果
-![HAG 检索结果](./docs/images/finalanswer.png)
+![HAG 检索结果](./docs/images/huida.png)
 *全面检索结果示例，展示文档、实体和关系信息*
 
 ### 4. 存储效果
