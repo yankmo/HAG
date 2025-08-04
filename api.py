@@ -385,37 +385,29 @@ class HAGIntegratedAPI:
                     details={"error": str(e)}
                 ))
             
-            # 步骤4: 关系检索 (Neo4j)
+            # 步骤4: 关系检索 (Neo4j) - 使用智能关系搜索
             step4_start = time.time()
             try:
-                all_relationships = []
-                for entity in entities:
-                    entity_name = entity.get('name', '')
-                    if entity_name:
-                        entity_rels = self.graph_service.get_entity_relationships(entity_name, limit=5)
-                        relationships = entity_rels.get('relationships', [])
-                        all_relationships.extend(relationships)
+                # 使用优化的关系搜索方法，基于查询内容和相关性评分
+                unique_relationships = self.graph_service.search_relationships_by_query(question, limit=10)
                 
-                # 去重
-                seen_relations = set()
-                unique_relationships = []
-                for rel in all_relationships:
-                    rel_key = (rel.get('entity', ''), rel.get('relation_type', ''), rel.get('related_entity', ''))
-                    if rel_key not in seen_relations:
-                        seen_relations.add(rel_key)
-                        unique_relationships.append(rel)
+                logger.info(f"智能关系搜索结果: {len(unique_relationships)} 个关系")
+                for rel in unique_relationships[:3]:  # 记录前3个关系用于调试
+                    logger.info(f"  - {rel.get('source', '')} -> {rel.get('type', '')} -> {rel.get('target', '')} (评分: {rel.get('relevance_score', 0)})")
                 
                 step4_end = time.time()
                 retrieval_steps.append(RetrievalStep(
                     step_name="关系检索",
-                    step_description="从Neo4j图数据库检索实体间关系",
+                    step_description="从Neo4j图数据库检索实体间关系（基于查询相关性）",
                     start_time=step4_start,
                     end_time=step4_end,
                     duration=step4_end - step4_start,
                     status="success",
                     result_count=len(unique_relationships),
                     details={
-                        "relation_types": list(set([rel.get('relation_type', '') for rel in unique_relationships])) if unique_relationships else []
+                        "relation_types": list(set([rel.get('type', '') for rel in unique_relationships])) if unique_relationships else [],
+                        "avg_relevance_score": sum([rel.get('relevance_score', 0) for rel in unique_relationships]) / len(unique_relationships) if unique_relationships else 0,
+                        "top_relations": [f"{rel.get('source', '')} -> {rel.get('type', '')} -> {rel.get('target', '')}" for rel in unique_relationships[:3]]
                     }
                 ))
             except Exception as e:

@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import './App.css';
 
 interface Message {
@@ -6,7 +8,23 @@ interface Message {
   text: string;
   isUser: boolean;
   timestamp: Date;
-  sources?: any;
+  isStreaming?: boolean;
+  sources?: {
+    documents?: Array<{
+      content: string;
+      score: number;
+    }>;
+    entities?: Array<{
+      name: string;
+      type: string;
+    }>;
+    relationships?: Array<{
+      source: string;
+      target: string;
+      type: string;
+      description?: string;
+    }>;
+  };
 }
 
 function App() {
@@ -41,11 +59,7 @@ function App() {
     e.preventDefault();
     if (!inputValue.trim() || isLoading) return;
 
-    // 首次发送消息时展开界面
-    if (!isExpanded) {
-      setIsExpanded(true);
-    }
-
+    // 添加用户消息
     const userMessage: Message = {
       id: Date.now(),
       text: inputValue,
@@ -53,43 +67,98 @@ function App() {
       timestamp: new Date()
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    // 创建助手消息（初始状态为思考中）
+    const botMessageId = Date.now() + 1;
+    const botMessage: Message = {
+      id: botMessageId,
+      text: '',
+      isUser: false,
+      timestamp: new Date(),
+      isStreaming: true
+    };
+
+    setMessages(prev => [...prev, userMessage, botMessage]);
+    const question = inputValue;
     setInputValue('');
     setIsLoading(true);
+    setIsExpanded(true);
 
     try {
-      const response = await fetch('http://localhost:8000/query', {
+      const response = await fetch('http://localhost:8000/query/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ question: inputValue }),
+        body: JSON.stringify({ question }),
       });
 
       if (!response.ok) {
-        throw new Error('Network response was not ok');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-      
-      const botMessage: Message = {
-        id: Date.now() + 1,
-        text: data.answer || '抱歉，我无法处理您的请求。',
-        isUser: false,
-        timestamp: new Date(),
-        sources: data.sources || {}
-      };
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
 
-      setMessages(prev => [...prev, botMessage]);
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                
+                if (data.type === 'content') {
+                  // 更新消息内容
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === botMessageId 
+                      ? { ...msg, text: data.content, isStreaming: false }
+                      : msg
+                  ));
+                } else if (data.type === 'sources') {
+                  // 添加来源信息
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === botMessageId 
+                      ? { ...msg, sources: data.sources, isStreaming: true }
+                      : msg
+                  ));
+                } else if (data.type === 'done') {
+                  // 完成流式响应
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === botMessageId 
+                      ? { ...msg, isStreaming: false }
+                      : msg
+                  ));
+                } else if (data.type === 'error') {
+                  // 处理错误
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === botMessageId 
+                      ? { ...msg, text: data.message, isStreaming: false }
+                      : msg
+                  ));
+                }
+              } catch (parseError) {
+                console.error('解析流数据失败:', parseError);
+              }
+            }
+          }
+        }
+      }
     } catch (error) {
       console.error('Error:', error);
-      const errorMessage: Message = {
-        id: Date.now() + 1,
-        text: '抱歉，连接服务器时出现错误。请稍后再试。',
-        isUser: false,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => prev.map(msg => 
+        msg.id === botMessageId 
+          ? { 
+              ...msg, 
+              text: '抱歉，连接服务器时出现错误。请稍后再试。',
+              isStreaming: false
+            }
+          : msg
+      ));
     } finally {
       setIsLoading(false);
     }
@@ -147,7 +216,58 @@ function App() {
               {messages.map((message) => (
                 <div key={message.id} className={`message ${message.isUser ? 'user' : 'assistant'}`}>
                   <div className="message-content">
-                    <div className="message-text">{message.text}</div>
+                    <div className="message-text">
+                      {message.isUser ? (
+                        message.text
+                      ) : (
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            // 自定义代码块样式
+                            code: ({node, className, children, ...props}: any) => {
+                              const match = /language-(\w+)/.exec(className || '');
+                              // 如果有语言标识或者在pre标签内，则为代码块
+                              const isCodeBlock = match || (node?.parent?.tagName === 'pre');
+                              
+                              if (isCodeBlock) {
+                                return (
+                                  <pre className="code-block">
+                                    <code className={className} {...props}>
+                                      {children}
+                                    </code>
+                                  </pre>
+                                );
+                              } else {
+                                return (
+                                  <code className="inline-code" {...props}>
+                                    {children}
+                                  </code>
+                                );
+                              }
+                            },
+                            // 自定义表格样式
+                            table: ({children}) => (
+                              <div className="table-wrapper">
+                                <table className="markdown-table">{children}</table>
+                              </div>
+                            ),
+                            // 自定义链接样式
+                            a: ({children, href}) => (
+                              <a href={href} target="_blank" rel="noopener noreferrer" className="markdown-link">
+                                {children}
+                              </a>
+                            )
+                          }}
+                        >
+                          {message.text}
+                        </ReactMarkdown>
+                      )}
+                      {message.isStreaming && (
+                        <span className="thinking-indicator">
+                          思考中<span className="thinking-dots">...</span>
+                        </span>
+                      )}
+                    </div>
                     
                     {/* 参考来源 */}
                     {message.sources && (
@@ -219,20 +339,7 @@ function App() {
                   </div>
                 </div>
               ))}
-              {isLoading && (
-                <div className="message assistant">
-                  <div className="message-content">
-                    <div className="loading-indicator">
-                      <div className="loading-dots">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                      </div>
-                      <span className="loading-text">正在思考...</span>
-                    </div>
-                  </div>
-                </div>
-              )}
+
               <div ref={messagesEndRef} />
             </div>
           </div>
