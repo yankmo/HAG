@@ -1,24 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './App.css';
 
-interface RetrievalStep {
-  step_name: string;
-  step_description: string;
-  start_time: number;
-  end_time: number;
-  duration: number;
-  status: string;
-  result_count: number;
-  details: Record<string, any>;
-}
-
 interface Message {
   id: number;
   text: string;
   isUser: boolean;
   timestamp: Date;
   sources?: any;
-  retrievalProcess?: RetrievalStep[];
 }
 
 function App() {
@@ -26,15 +14,15 @@ function App() {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [expandedProcesses, setExpandedProcesses] = useState<Set<number>>(new Set());
+  const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const toggleProcessExpansion = (messageId: number) => {
-    setExpandedProcesses(prev => {
+  const toggleSourcesExpansion = (messageId: number) => {
+    setExpandedSources(prev => {
       const newSet = new Set(prev);
       if (newSet.has(messageId)) {
         newSet.delete(messageId);
@@ -89,8 +77,7 @@ function App() {
         text: data.answer || '抱歉，我无法处理您的请求。',
         isUser: false,
         timestamp: new Date(),
-        sources: data.sources || {},
-        retrievalProcess: data.retrieval_process || []
+        sources: data.sources || {}
       };
 
       setMessages(prev => [...prev, botMessage]);
@@ -162,117 +149,66 @@ function App() {
                   <div className="message-content">
                     <div className="message-text">{message.text}</div>
                     
-                    {/* 检索过程展示 */}
-                    {!message.isUser && message.retrievalProcess && message.retrievalProcess.length > 0 && (
-                      <div className="retrieval-process-container">
+                    {/* 参考来源 */}
+                    {message.sources && (
+                      <div className="message-sources">
                         <div 
-                          className="retrieval-process-header"
-                          onClick={() => toggleProcessExpansion(message.id)}
+                          className="sources-header"
+                          onClick={() => toggleSourcesExpansion(message.id)}
                         >
-                          <span className="retrieval-process-title">
-                            🔍 检索过程 ({message.retrievalProcess.length} 步骤)
-                          </span>
-                          <span className={`expand-icon ${expandedProcesses.has(message.id) ? 'expanded' : ''}`}>
+                          <span className="sources-title">参考文档</span>
+                          <span className={`expand-icon ${expandedSources.has(message.id) ? 'expanded' : ''}`}>
                             ▼
                           </span>
                         </div>
                         
-                        {expandedProcesses.has(message.id) && (
-                          <div className="retrieval-process-content">
-                            <div className="process-timeline">
-                              {message.retrievalProcess.map((step, index) => (
-                                <div key={index} className={`process-step ${step.status}`}>
-                                  <div className="step-indicator">
-                                    <div className="step-number">{index + 1}</div>
-                                    <div className={`step-status ${step.status}`}>
-                                      {step.status === 'success' ? '✓' : '✗'}
+                        {expandedSources.has(message.id) && (
+                          <div className="sources-content">
+                            {message.sources.documents && message.sources.documents.length > 0 && (
+                              <div className="sources-section">
+                                <div className="sources-section-title">参考文档：</div>
+                                <div className="sources-list">
+                                  {message.sources.documents.map((doc: any, index: number) => (
+                                    <div key={index} className="source-item document">
+                                      <div className="source-content">{doc.content}</div>
+                                      <div className="source-score">相似度: {(doc.score * 100).toFixed(1)}%</div>
                                     </div>
-                                  </div>
-                                  <div className="step-content">
-                                    <div className="step-header">
-                                      <span className="step-name">{step.step_name}</span>
-                                      <span className="step-duration">
-                                        {(step.duration * 1000).toFixed(0)}ms
-                                      </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {message.sources.entities && message.sources.entities.length > 0 && (
+                              <div className="sources-section">
+                                <div className="sources-section-title">相关实体：</div>
+                                <div className="sources-list">
+                                  {message.sources.entities.map((entity: any, index: number) => (
+                                    <div key={index} className="source-item entity">
+                                      <span className="entity-name">{entity.name}</span>
+                                      <span className="entity-type">({entity.type})</span>
                                     </div>
-                                    <div className="step-description">{step.step_description}</div>
-                                    <div className="step-results">
-                                      <span className="result-count">
-                                        结果数量: {step.result_count}
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {message.sources.relationships && message.sources.relationships.length > 0 && (
+                              <div className="sources-section">
+                                <div className="sources-section-title">相关关系：</div>
+                                <div className="sources-list">
+                                  {message.sources.relationships.map((rel: any, index: number) => (
+                                    <div key={index} className="source-item relationship">
+                                      <span className="relationship-text">
+                                        {rel.source} → {rel.target} ({rel.type})
                                       </span>
-                                      {step.details && Object.keys(step.details).length > 0 && (
-                                        <div className="step-details">
-                                          {Object.entries(step.details).map(([key, value]) => (
-                                            <span key={key} className="detail-item">
-                                              {key}: {Array.isArray(value) ? value.join(', ') : String(value)}
-                                            </span>
-                                          ))}
-                                        </div>
+                                      {rel.description && (
+                                        <div className="relationship-desc">{rel.description}</div>
                                       )}
                                     </div>
-                                  </div>
+                                  ))}
                                 </div>
-                              ))}
-                            </div>
-                            <div className="process-summary">
-                              <span className="total-time">
-                                总耗时: {(message.retrievalProcess.reduce((sum, step) => sum + step.duration, 0) * 1000).toFixed(0)}ms
-                              </span>
-                              <span className="success-rate">
-                                成功率: {Math.round((message.retrievalProcess.filter(s => s.status === 'success').length / message.retrievalProcess.length) * 100)}%
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* 参考来源 */}
-                    {message.sources && (
-                      <div className="message-sources">
-                        {message.sources.documents && message.sources.documents.length > 0 && (
-                          <div className="sources-section">
-                            <div className="sources-title">📄 参考文档：</div>
-                            <div className="sources-list">
-                              {message.sources.documents.map((doc: any, index: number) => (
-                                <div key={index} className="source-item document">
-                                  <div className="source-content">{doc.content}</div>
-                                  <div className="source-score">相似度: {(doc.score * 100).toFixed(1)}%</div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {message.sources.entities && message.sources.entities.length > 0 && (
-                          <div className="sources-section">
-                            <div className="sources-title">🏷️ 相关实体：</div>
-                            <div className="sources-list">
-                              {message.sources.entities.map((entity: any, index: number) => (
-                                <div key={index} className="source-item entity">
-                                  <span className="entity-name">{entity.name}</span>
-                                  <span className="entity-type">({entity.type})</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        
-                        {message.sources.relationships && message.sources.relationships.length > 0 && (
-                          <div className="sources-section">
-                            <div className="sources-title">🔗 相关关系：</div>
-                            <div className="sources-list">
-                              {message.sources.relationships.map((rel: any, index: number) => (
-                                <div key={index} className="source-item relationship">
-                                  <span className="relationship-text">
-                                    {rel.source} → {rel.target} ({rel.type})
-                                  </span>
-                                  {rel.description && (
-                                    <div className="relationship-desc">{rel.description}</div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

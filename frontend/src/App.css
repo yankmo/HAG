@@ -455,27 +455,26 @@ body {
   }
 }
 
-/* 检索过程样式 */
-.retrieval-process {
-  margin-top: 12px;
-  border-top: 1px solid var(--border-color);
-  padding-top: 12px;
-}
-
-.process-header {
+/* 参考文档折叠样式 */
+.sources-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-  padding: 8px 0;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
   transition: var(--transition);
+  margin-bottom: 8px;
 }
 
-.process-header:hover {
-  color: var(--accent-purple-light);
+.sources-header:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(139, 92, 246, 0.3);
 }
 
-.process-title {
+.sources-title {
   font-size: 12px;
   color: var(--text-secondary);
   font-weight: 600;
@@ -484,38 +483,23 @@ body {
   gap: 8px;
 }
 
-.process-summary {
-  font-size: 11px;
+.expand-icon {
+  font-size: 10px;
   color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  transition: transform 0.3s ease;
+  transform: rotate(-90deg);
 }
 
-.process-toggle {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
-  transition: var(--transition);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.expand-icon.expanded {
+  transform: rotate(0deg);
 }
 
-.process-toggle:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--accent-purple-light);
+.sources-content {
+  animation: sourcesSlideDown 0.3s ease-out;
+  overflow: hidden;
 }
 
-.process-content {
-  margin-top: 12px;
-  animation: processSlideDown 0.3s ease-out;
-}
-
-@keyframes processSlideDown {
+@keyframes sourcesSlideDown {
   from {
     opacity: 0;
     max-height: 0;
@@ -523,138 +507,25 @@ body {
   }
   to {
     opacity: 1;
-    max-height: 500px;
+    max-height: 1000px;
     transform: translateY(0);
   }
 }
 
-.process-timeline {
-  position: relative;
-  padding-left: 20px;
+.sources-section {
+  margin-bottom: 12px;
 }
 
-.process-timeline::before {
-  content: '';
-  position: absolute;
-  left: 8px;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: linear-gradient(to bottom, var(--accent-purple), var(--accent-purple-dark));
-  border-radius: 1px;
+.sources-section:last-child {
+  margin-bottom: 0;
 }
 
-.process-step {
-  position: relative;
-  margin-bottom: 16px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  padding: 12px 16px;
-  transition: var(--transition);
-}
-
-.process-step:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(139, 92, 246, 0.3);
-}
-
-.process-step::before {
-  content: '';
-  position: absolute;
-  left: -28px;
-  top: 16px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 2px solid var(--accent-purple);
-  background: var(--primary-bg);
-  z-index: 1;
-}
-
-.process-step.success::before {
-  background: var(--success-color);
-  border-color: var(--success-color);
-}
-
-.process-step.error::before {
-  background: var(--error-color);
-  border-color: var(--error-color);
-}
-
-.step-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.step-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.step-duration {
+.sources-section-title {
   font-size: 11px;
-  color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.05);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.step-description {
-  font-size: 12px;
   color: var(--text-secondary);
-  margin-bottom: 8px;
-  line-height: 1.4;
-}
-
-.step-details {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.step-status {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 500;
-}
-
-.step-status.success {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--success-color);
-}
-
-.step-status.error {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--error-color);
-}
-
-.step-status.warning {
-  background: rgba(245, 158, 11, 0.1);
-  color: var(--warning-color);
-}
-
-.step-result-count {
-  background: rgba(139, 92, 246, 0.1);
-  color: var(--accent-purple-light);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 500;
-}
-
-/* 检索过程图标 */
-.process-icon {
-  width: 14px;
-  height: 14px;
-  opacity: 0.7;
+  font-weight: 600;
+  margin-bottom: 6px;
+  padding-left: 4px;
 }
 
 /* 噪点纹理效果 */
