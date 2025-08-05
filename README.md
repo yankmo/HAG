@@ -1,4 +1,4 @@
-# HAG: 混合增强生成框架
+# HAG: Hybrid Augmented Generation Framework
 
 <div align="center">
 
@@ -11,198 +11,199 @@
 [![Neo4j](https://img.shields.io/badge/Neo4j-5.0+-red.svg)](https://neo4j.com/)
 [![Weaviate](https://img.shields.io/badge/Weaviate-1.20+-orange.svg)](https://weaviate.io/)
 
-[English](README_EN.md) | [中文](README.md)
+[English](README.md) | [中文](README_CN.md)
 
-**作者**: [YankMo](https://github.com/yankmo)
+**Author**: [YankMo](https://github.com/yankmo)
 
 </div>
 
 ---
 
-## 🚀 HAG 是什么？
+## 🚀 What is HAG?
 
-HAG（混合增强生成）是一个先进的知识增强生成框架，结合了向量数据库和知识图谱的强大功能，提供智能问答能力。基于 LangChain、Neo4j 和 Weaviate 构建，HAG 在领域特定知识检索和推理方面表现卓越。
+HAG (Hybrid Augmented Generation) is an advanced knowledge-enhanced generation framework that combines the powerful capabilities of vector databases and knowledge graphs to provide intelligent Q&A capabilities. Built on LangChain, Neo4j, and Weaviate, HAG excels in domain-specific knowledge retrieval and reasoning.
 
-## ✨ 核心功能
+## ✨ Core Features
 
-### 🎯 智能意图识别
-- **多维度理解**：深度解析用户查询意图，精准匹配知识需求
-- **上下文感知**：基于对话历史和语义理解，提供个性化响应
+### 🎯 Intelligent Intent Recognition
+- **Multi-dimensional Understanding**: Deep analysis of user query intent with precise knowledge need matching
+- **Context Awareness**: Personalized responses based on conversation history and semantic understanding
 
-### 🔄 双数据库集成架构
-- **向量数据库**：Weaviate 提供高效语义相似性搜索
-- **知识图谱**：Neo4j 实现复杂关系推理和实体发现
-- **混合检索**：智能融合两种数据源，确保检索准确性和完整性
+### 🔄 Dual Database Integration Architecture
+- **Vector Database**: Weaviate provides efficient semantic similarity search
+- **Knowledge Graph**: Neo4j enables complex relationship reasoning and entity discovery
+- **Hybrid Retrieval**: Intelligent fusion of two data sources ensuring retrieval accuracy and completeness
 
-### 🚀 可调用API服务
-- **RESTful接口**：标准化API设计，支持多种编程语言调用
-- **模块化架构**：独立的嵌入、检索、生成服务，灵活组合
-- **LangChain集成**：可运行管道架构，支持复杂工作流编排
+### 🚀 Callable API Services
+- **RESTful Interface**: Standardized API design supporting multiple programming language calls
+- **Modular Architecture**: Independent embedding, retrieval, and generation services with flexible composition
+- **LangChain Integration**: Runnable pipeline architecture supporting complex workflow orchestration
 
-### 🎨 LINEAR风格前端设计
-- **现代化界面**：简洁优雅的用户体验，遵循LINEAR设计理念
-- **实时反馈**：流式响应显示，即时状态更新
-- **智能交互**：直观的对话界面，支持多轮对话和历史记录
+### 🎨 LINEAR Style Frontend Design
+- **Modern Interface**: Clean and elegant user experience following LINEAR design principles
+- **Real-time Feedback**: Streaming response display with instant status updates
+- **Intelligent Interaction**: Intuitive chat interface supporting multi-turn conversations and history
 
-## 系统架构
+## System Architecture
 
-![工作流程](./docs/images/black.svg)
+![Workflow](./docs/images/black.svg)
 *What is HAG*
-## 📸 效果展示
 
-### 1. Web 界面
-![HAG Web 界面](./docs/images/Newapp.png)
-*LINEAR设计风格前端界面*
+## 📸 Demo Gallery
 
-### 2. 检索效果
-![HAG 检索效果](./docs/images/NewSearch.png)
-*混合检索工作流程展示，融合向量数据库和知识图谱*
+### 1. Web Interface
+![HAG Web Interface](./docs/images/Newapp.png)
+*LINEAR style frontend interface*
 
-### 3. 最终回答
-![HAG 最终回答](./docs/images/Newanswer.png)
-*智能问答结果展示，包含完整的知识来源和推理过程*
+### 2. Retrieval Effects
+![HAG Retrieval Effects](./docs/images/NewSearch.png)
+*Hybrid retrieval workflow demonstration, integrating vector database and knowledge graph*
 
-## 📦 安装
+### 3. Final Answer
+![HAG Final Answer](./docs/images/Newanswer.png)
+*Intelligent Q&A result display with complete knowledge sources and reasoning process*
 
-### 前置要求
-- Python 3.8 或更高版本
-- Docker 和 Docker Compose
+## 📦 Installation
+
+### Prerequisites
+- Python 3.8 or higher
+- Docker and Docker Compose
 - Git
 
-### 快速开始
+### Quick Start
 
-1. **克隆仓库**
+1. **Clone Repository**
 ```bash
 git clone https://github.com/yankmo/HAG.git
 cd HAG
 ```
 
-2. **安装依赖**
+2. **Install Dependencies**
 ```bash
 pip install -r requirements.txt
 ```
 
-3. **启动必需服务**
+3. **Start Required Services**
 ```bash
-# 启动 Neo4j
+# Start Neo4j
 docker run -d --name neo4j \
   -p 7474:7474 -p 7687:7687 \
   -e NEO4J_AUTH=neo4j/your_password \
   neo4j:latest
 
-# 启动 Weaviate
+# Start Weaviate
 docker run -d --name weaviate \
   -p 8080:8080 \
   -e QUERY_DEFAULTS_LIMIT=25 \
   -e AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true \
   semitechnologies/weaviate:latest
 
-# 启动 Ollama
+# Start Ollama
 docker run -d --name ollama \
   -p 11434:11434 \
   ollama/ollama:latest
 ```
 
-4. **配置系统**
+4. **Configure System**
 ```bash
-# 编辑配置文件
+# Edit configuration file
 cp config/config.yaml.example config/config.yaml
-# 更新数据库凭据和服务 URL
+# Update database credentials and service URLs
 ```
 
-5. **运行应用程序**
+5. **Run Application**
 ```bash
-# 启动 Web 界面
+# Start Web Interface
 streamlit run app_simple.py
 
-# 或直接使用 API
+# Or use API directly
 python api.py
 ```
 
-## 🔧 配置
+## 🔧 Configuration
 
-编辑 `config/config.yaml` 来自定义您的设置：
+Edit `config/config.yaml` to customize your settings:
 
 ```yaml
-# Neo4j 配置
+# Neo4j Configuration
 neo4j:
   uri: "bolt://localhost:7687"
   username: "neo4j"
   password: "your_password"
 
-# Ollama 配置
+# Ollama Configuration
 ollama:
   base_url: "http://localhost:11434"
   default_model: "gemma3:4b"
   embedding_model: "bge-m3:latest"
 
-# Weaviate 配置
+# Weaviate Configuration
 weaviate:
   url: "http://localhost:8080"
 ```
 
-## 🧪 使用示例
+## 🧪 Usage Examples
 
-### Web 界面
+### Web Interface
 ```bash
 streamlit run app_simple.py
 ```
-导航到 `http://localhost:8501` 并开始提问！
+Navigate to `http://localhost:8501` and start asking questions!
 
-### API 使用
+### API Usage
 ```python
 from api import HAGIntegratedAPI
 
-# 初始化系统
+# Initialize system
 hag = HAGIntegratedAPI()
 
-# 提问
-response = hag.runnable_chain.invoke("帕金森病的症状是什么？")
+# Ask questions
+response = hag.runnable_chain.invoke("What are the symptoms of Parkinson's disease?")
 print(response)
 ```
 
-### 直接服务访问
+### Direct Service Access
 ```python
 from src.services import HybridRetrievalService
 
-# 直接使用混合检索
+# Use hybrid retrieval directly
 hybrid_service = HybridRetrievalService(...)
-results = hybrid_service.search("医疗查询", limit=5)
+results = hybrid_service.search("medical query", limit=5)
 ```
 
-## 🧪 测试
+## 🧪 Testing
 
-运行测试套件以验证您的安装：
+Run the test suite to verify your installation:
 
 ```bash
-# 测试基本功能
-python -c "from api import HAGIntegratedAPI; api = HAGIntegratedAPI(); print('✅ HAG 初始化成功')"
+# Test basic functionality
+python -c "from api import HAGIntegratedAPI; api = HAGIntegratedAPI(); print('✅ HAG initialized successfully')"
 ```
 
-## 🤝 贡献
+## 🤝 Contributing
 
-我们欢迎贡献！请查看我们的[贡献指南](CONTRIBUTING.md)了解详情。
+We welcome contributions! Please check our [Contributing Guide](CONTRIBUTING.md) for details.
 
-1. Fork 仓库
-2. 创建您的功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交您的更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 打开 Pull Request
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## 📄 许可证
+## 📄 License
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 👨‍💻 作者
+## 👨‍💻 Author
 
 **YankMo**
 - GitHub: [@yankmo](https://github.com/yankmo)
-- CSDN 博客: [YankMo 的技术博客](https://blog.csdn.net/YankMo)
+- CSDN Blog: [YankMo's Tech Blog](https://blog.csdn.net/YankMo)
 
 ---
 
 <div align="center">
 
-**⭐ 如果这个项目对您有帮助，请给我们一个 Star！**
+**⭐ If this project helps you, please give us a Star!**
 
 </div>
