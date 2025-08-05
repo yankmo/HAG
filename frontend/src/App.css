@@ -490,7 +490,7 @@ body {
 .message-text h4,
 .message-text h5,
 .message-text h6 {
-  margin: 16px 0 8px 0;
+  margin: 12px 0 6px 0;
   font-weight: 600;
   line-height: 1.25;
 }
@@ -501,25 +501,27 @@ body {
 
 .message-text ul,
 .message-text ol {
-  margin: 8px 0;
+  margin: 6px 0;
   padding-left: 20px;
 }
 
 .message-text li {
-  margin: 4px 0;
+  margin: 2px 0;
+  line-height: 1.4;
 }
 
 .message-text blockquote {
   border-left: 4px solid #ddd;
-  margin: 12px 0;
-  padding: 8px 16px;
+  margin: 8px 0;
+  padding: 6px 12px;
   background-color: #f9f9f9;
   font-style: italic;
+  line-height: 1.4;
 }
 
 .message-text p {
-  margin: 8px 0;
-  line-height: 1.6;
+  margin: 4px 0;
+  line-height: 1.4;
 }
 
 /* 思考中指示器 */

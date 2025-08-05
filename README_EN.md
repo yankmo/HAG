@@ -1,4 +1,4 @@
-# HAG: Hybrid Augmented Generation
+# HAG: Hybrid Augmented Generation Framework
 
 <div align="center">
 
@@ -21,77 +21,47 @@
 
 ## 🚀 What is HAG?
 
-HAG (Hybrid Augmented Generation) is an advanced knowledge-enhanced generation framework that combines the power of vector databases and knowledge graphs to provide intelligent question-answering capabilities. Built on top of LangChain, Neo4j, and Weaviate, HAG delivers superior performance in domain-specific knowledge retrieval and reasoning.
-
-## 📸 Screenshots
-
-### 1. Web Interface
-![HAG Web Interface](./docs/images/web.png)
-*Modern Streamlit-powered web interface with real-time system monitoring and chat functionality*
-
-### 2. Retrieval Process
-![HAG Retrieval Process](./docs/images/document.png)
-*Visual demonstration of hybrid retrieval workflow combining vector and graph databases*
-
-### 3. Retrieval Results
-![HAG Retrieval Results](./docs/images/huida.png)
-*Example of comprehensive retrieval results showing documents, entities, and relationships*
-
-### 4. Storage Architecture
-![HAG Storage Architecture](./docs/images/neo4j.png)
-*Data storage structure in Weaviate vector database and Neo4j knowledge graph*
+HAG (Hybrid Augmented Generation) is an advanced knowledge-enhanced generation framework that combines the powerful capabilities of vector databases and knowledge graphs to provide intelligent Q&A capabilities. Built on LangChain, Neo4j, and Weaviate, HAG excels in domain-specific knowledge retrieval and reasoning.
 
 ## ✨ Core Features
 
-### 🔄 Hybrid Knowledge Representation
-- **Dual Storage Architecture**: Seamlessly integrates Weaviate vector database for semantic similarity search and Neo4j graph database for relationship-based reasoning
-- **Multi-Modal Knowledge**: Supports both structured (entities, relationships) and unstructured (documents, text chunks) knowledge representation
-- **Cross-Index Mapping**: Maintains bidirectional references between graph structures and original text fragments
+### 🎯 Intelligent Intent Recognition
+- **Multi-dimensional Understanding**: Deep analysis of user query intent with precise knowledge need matching
+- **Context Awareness**: Personalized responses based on conversation history and semantic understanding
 
-### 🎯 Advanced Retrieval System
-- **Dual Similarity Metrics**: Combines cosine similarity and Euclidean distance for enhanced document retrieval accuracy
-- **Graph-Based Entity Search**: Leverages Neo4j's powerful graph traversal capabilities for entity and relationship discovery
-- **Weighted Hybrid Retrieval**: Intelligently balances document retrieval (60%) and graph retrieval (40%) for optimal results
+### 🔄 Dual Database Integration Architecture
+- **Vector Database**: Weaviate provides efficient semantic similarity search
+- **Knowledge Graph**: Neo4j enables complex relationship reasoning and entity discovery
+- **Hybrid Retrieval**: Intelligent fusion of two data sources ensuring retrieval accuracy and completeness
 
-### 🔗 LangChain Integration
-- **Runnable Pipeline Architecture**: Built using LangChain's Runnable interface for modular and extensible processing chains
-- **Parallel Retrieval Branches**: Implements three concurrent retrieval paths (documents, entities, relationships) for comprehensive knowledge gathering
-- **Unified Response Generation**: Integrates multiple knowledge sources into coherent, contextually-aware responses
+### 🚀 Callable API Services
+- **RESTful Interface**: Standardized API design supporting multiple programming language calls
+- **Modular Architecture**: Independent embedding, retrieval, and generation services with flexible composition
+- **LangChain Integration**: Runnable pipeline architecture supporting complex workflow orchestration
 
-### 🌐 Intelligent Web Interface
-- **Streamlit-Powered UI**: Modern, responsive web interface for easy interaction
-- **Real-Time System Monitoring**: Live status indicators for all connected services (Ollama, Neo4j, Weaviate)
-- **Interactive Chat Experience**: Conversational interface with message history and system statistics
+### 🎨 LINEAR Style Frontend Design
+- **Modern Interface**: Clean and elegant user experience following LINEAR design principles
+- **Real-time Feedback**: Streaming response display with instant status updates
+- **Intelligent Interaction**: Intuitive chat interface supporting multi-turn conversations and history
 
-### 🔌 Comprehensive API Interface
-- **RESTful API Design**: Clean, well-documented API endpoints for programmatic access
-- **Modular Service Architecture**: Independent services for embedding, retrieval, and generation
-- **Error Handling & Logging**: Robust error management with detailed logging for debugging
+## System Architecture
 
-## 🏗️ System Architecture
+![Workflow](./docs/images/black.svg)
+*What is HAG*
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   User Query    │    │  LangChain      │    │   Response      │
-│                 │───▶│  Runnable       │───▶│   Generation    │
-│                 │    │  Pipeline       │    │                 │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────┐
-                    │ Parallel        │
-                    │ Retrieval       │
-                    │ Branches        │
-                    └─────────────────┘
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        ▼                     ▼                     ▼
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│  Document   │    │   Entity    │    │Relationship │
-│ Retrieval   │    │ Retrieval   │    │ Retrieval   │
-│ (Weaviate)  │    │  (Neo4j)    │    │  (Neo4j)    │
-└─────────────┘    └─────────────┘    └─────────────┘
-```
+## 📸 Demo Gallery
+
+### 1. Web Interface
+![HAG Web Interface](./docs/images/Newapp.png)
+*LINEAR style frontend interface*
+
+### 2. Retrieval Effects
+![HAG Retrieval Effects](./docs/images/NewSearch.png)
+*Hybrid retrieval workflow demonstration, integrating vector database and knowledge graph*
+
+### 3. Final Answer
+![HAG Final Answer](./docs/images/Newanswer.png)
+*Intelligent Q&A result display with complete knowledge sources and reasoning process*
 
 ## 📦 Installation
 
@@ -102,18 +72,18 @@ HAG (Hybrid Augmented Generation) is an advanced knowledge-enhanced generation f
 
 ### Quick Start
 
-1. **Clone the repository**
+1. **Clone Repository**
 ```bash
 git clone https://github.com/yankmo/HAG.git
 cd HAG
 ```
 
-2. **Install dependencies**
+2. **Install Dependencies**
 ```bash
 pip install -r requirements.txt
 ```
 
-3. **Start required services**
+3. **Start Required Services**
 ```bash
 # Start Neo4j
 docker run -d --name neo4j \
@@ -134,16 +104,16 @@ docker run -d --name ollama \
   ollama/ollama:latest
 ```
 
-4. **Configure the system**
+4. **Configure System**
 ```bash
 # Edit configuration file
 cp config/config.yaml.example config/config.yaml
 # Update database credentials and service URLs
 ```
 
-5. **Run the application**
+5. **Run Application**
 ```bash
-# Start web interface
+# Start Web Interface
 streamlit run app_simple.py
 
 # Or use API directly
@@ -152,7 +122,7 @@ python api.py
 
 ## 🔧 Configuration
 
-Edit `config/config.yaml` to customize your setup:
+Edit `config/config.yaml` to customize your settings:
 
 ```yaml
 # Neo4j Configuration
@@ -184,10 +154,10 @@ Navigate to `http://localhost:8501` and start asking questions!
 ```python
 from api import HAGIntegratedAPI
 
-# Initialize the system
+# Initialize system
 hag = HAGIntegratedAPI()
 
-# Ask a question
+# Ask questions
 response = hag.runnable_chain.invoke("What are the symptoms of Parkinson's disease?")
 print(response)
 ```
@@ -212,7 +182,7 @@ python -c "from api import HAGIntegratedAPI; api = HAGIntegratedAPI(); print('�
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+We welcome contributions! Please check our [Contributing Guide](CONTRIBUTING.md) for details.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
