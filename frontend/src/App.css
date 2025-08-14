@@ -558,6 +558,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 3px;
 }
 
 .sessions-list::-webkit-scrollbar {
