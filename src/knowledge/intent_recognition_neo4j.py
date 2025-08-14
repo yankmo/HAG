@@ -416,21 +416,34 @@ class KnowledgeGraphBuilder:
 
 def main():
     """主函数"""
+    import sys
+    import os
+    
     try:
         # 创建知识图谱构建器
         builder = KnowledgeGraphBuilder()
         
-        # 处理帕金森氏症文档
-        file_path = "e:/Program/Project/rag-first/data/pajinsen.txt"
+        # 从命令行参数获取文件路径，如果没有提供则使用默认路径
+        if len(sys.argv) > 1:
+            file_path = sys.argv[1]
+        else:
+            # 使用相对路径作为默认值
+            file_path = os.path.join("data", "pajinsen.txt")
+            
+        # 检查文件是否存在
+        if not os.path.exists(file_path):
+            logger.error(f"文件不存在: {file_path}")
+            logger.info("使用方法: python intent_recognition_neo4j.py [文件路径]")
+            return
+            
         builder.process_text_file(file_path)
         
-        print("✅ 意图识别和数据导入完成！")
-        print("📊 请在Neo4j Browser中查看构建的知识图谱")
-        print("🔗 Neo4j Browser: http://localhost:7474")
+        logger.info("意图识别和数据导入完成！")
+        logger.info("请在Neo4j Browser中查看构建的知识图谱")
+        logger.info("Neo4j Browser: http://localhost:7474")
         
     except Exception as e:
         logger.error(f"程序执行失败: {e}")
-        print(f"❌ 执行失败: {e}")
 
 if __name__ == "__main__":
     main()

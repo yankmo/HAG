@@ -77,16 +77,19 @@ class RAG:
         # 先检索知识库再构建prompt传给ollama
         context = self.kb.search(text)
         prompt = self.prompt_template % (context[0], context[1], context[2], context[3], context[4], text)
-        print(prompt)
         response = ollama_client.chat(self.model, [Message(role='system', content=prompt)])
         return response['message']
 
 if __name__ == '__main__':
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    
     kb = Kb('knowledgeBase/帕金森氏症en.txt')
     rag = RAG('deepseek-r1:7b', kb)
 
     while True:
-        print(rag.prompt_template)
+        logger.info(f"当前提示模板: {rag.prompt_template}")
         q = input('Human:')
         r = rag.chat(q)
-        print('Assistant: ', r['content'])
+        logger.info(f"Assistant: {r['content']}")

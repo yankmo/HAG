@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { getApiUrl, default as API_CONFIG } from './config/api';
 import './App.css';
 
 interface Message {
@@ -33,6 +34,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set());
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -49,6 +51,13 @@ function App() {
       }
       return newSet;
     });
+  };
+
+  const clearSession = () => {
+    setMessages([]);
+    setSessionId(null);
+    setIsExpanded(false);
+    setExpandedSources(new Set());
   };
 
   useEffect(() => {
@@ -84,12 +93,16 @@ function App() {
     setIsExpanded(true);
 
     try {
-      const response = await fetch('http://localhost:8000/query/stream', {
+      const response = await fetch(getApiUrl(API_CONFIG.ENDPOINTS.QUERY_STREAM), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ 
+          question,
+          session_id: sessionId,
+          include_history: true
+        }),
       });
 
       if (!response.ok) {
@@ -112,7 +125,12 @@ function App() {
               try {
                 const data = JSON.parse(line.slice(6));
                 
-                if (data.type === 'content') {
+                if (data.type === 'session') {
+                  // 保存会话ID
+                  if (!sessionId) {
+                    setSessionId(data.session_id);
+                  }
+                } else if (data.type === 'content') {
                   // 更新消息内容
                   setMessages(prev => prev.map(msg => 
                     msg.id === botMessageId 
@@ -142,14 +160,14 @@ function App() {
                   ));
                 }
               } catch (parseError) {
-                console.error('解析流数据失败:', parseError);
+                // 解析流数据失败，跳过此行
               }
             }
           }
         }
       }
     } catch (error) {
-      console.error('Error:', error);
+      // 处理网络错误
       setMessages(prev => prev.map(msg => 
         msg.id === botMessageId 
           ? { 
@@ -207,8 +225,19 @@ function App() {
         // 展开状态 - 完整聊天界面
         <div className="chat-screen">
           <div className="chat-header">
-            <h1 className="chat-title">HAG</h1>
-            <p className="chat-subtitle">智能知识问答助手</p>
+            <div className="header-left">
+              <h1 className="chat-title">HAG</h1>
+              <p className="chat-subtitle">智能知识问答助手</p>
+            </div>
+            <div className="header-right">
+              <button 
+                onClick={clearSession}
+                className="clear-session-button"
+                title="开始新对话"
+              >
+                新对话
+              </button>
+            </div>
           </div>
 
           <div className="messages-container">

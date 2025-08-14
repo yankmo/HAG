@@ -167,7 +167,9 @@ class ConfigManager:
                         setattr(self.app, key, value)
                         
         except Exception as e:
-            print(f"警告：加载配置文件失败 {self.config_file}: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"加载配置文件失败 {self.config_file}: {e}")
     
     def save_config(self):
         """保存配置到文件"""

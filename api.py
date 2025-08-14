@@ -589,20 +589,20 @@ def query_knowledge(question: str) -> IntegratedResponse:
 if __name__ == "__main__":
     # 测试API
     try:
-        print("初始化HAG整合API...")
+        logger.info("初始化HAG整合API...")
         hag_api = HAGIntegratedAPI()
         
-        print("\n系统状态:")
+        logger.info("获取系统状态")
         status = hag_api.get_system_status()
-        print(status)
+        logger.info(f"系统状态: {status}")
         
-        print("\n测试查询...")
+        logger.info("开始测试查询")
         test_question = "什么是人工智能？"
         result = hag_api.query(test_question)
         
-        print(f"\n问题: {test_question}")
-        print(f"回答: {result.answer}")
-        print(f"来源数量: 文档{len(result.sources['documents'])}个, 实体{len(result.sources['entities'])}个, 关系{len(result.sources['relationships'])}个")
+        logger.info(f"测试完成 - 问题: {test_question}")
+        logger.info(f"回答长度: {len(result.answer)}")
+        logger.info(f"来源数量: 文档{len(result.sources['documents'])}个, 实体{len(result.sources['entities'])}个, 关系{len(result.sources['relationships'])}个")
         
     except Exception as e:
-        print(f"测试失败: {e}")
+        logger.error(f"测试失败: {e}")
