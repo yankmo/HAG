@@ -28,6 +28,76 @@ interface Message {
   };
 }
 
+interface Session {
+  id: string;
+  title: string;
+  timestamp: Date;
+  messages: Message[];
+}
+
+// localStorage工具函数
+const STORAGE_KEYS = {
+  SESSIONS: 'hag_sessions',
+  CURRENT_SESSION: 'hag_current_session'
+};
+
+const saveSessionsToStorage = (sessions: Session[]) => {
+  try {
+    const serializedSessions = sessions.map(session => ({
+      ...session,
+      timestamp: session.timestamp.toISOString(),
+      messages: session.messages.map(msg => ({
+        ...msg,
+        timestamp: msg.timestamp.toISOString()
+      }))
+    }));
+    localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(serializedSessions));
+  } catch (error) {
+    console.error('保存会话数据失败:', error);
+  }
+};
+
+const loadSessionsFromStorage = (): Session[] => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.SESSIONS);
+    if (!stored) return [];
+    
+    const parsed = JSON.parse(stored);
+    return parsed.map((session: any) => ({
+      ...session,
+      timestamp: new Date(session.timestamp),
+      messages: session.messages.map((msg: any) => ({
+        ...msg,
+        timestamp: new Date(msg.timestamp)
+      }))
+    }));
+  } catch (error) {
+    console.error('加载会话数据失败:', error);
+    return [];
+  }
+};
+
+const saveCurrentSessionToStorage = (sessionId: string | null) => {
+  try {
+    if (sessionId) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, sessionId);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+    }
+  } catch (error) {
+    console.error('保存当前会话ID失败:', error);
+  }
+};
+
+const loadCurrentSessionFromStorage = (): string | null => {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.CURRENT_SESSION);
+  } catch (error) {
+    console.error('加载当前会话ID失败:', error);
+    return null;
+  }
+};
+
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -37,7 +107,40 @@ function App() {
     new Set(),
   );
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [sidebarHovered, setSidebarHovered] = useState(false);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // 初始化加载会话数据
+  useEffect(() => {
+    const loadedSessions = loadSessionsFromStorage();
+    setSessions(loadedSessions);
+    
+    const currentSessionId = loadCurrentSessionFromStorage();
+    if (currentSessionId && loadedSessions.length > 0) {
+      const currentSession = loadedSessions.find(s => s.id === currentSessionId);
+      if (currentSession) {
+        setSessionId(currentSessionId);
+        setMessages(currentSession.messages);
+        if (currentSession.messages.length > 0) {
+          setIsExpanded(true);
+        }
+      }
+    }
+  }, []);
+
+  // 保存会话数据到localStorage
+  useEffect(() => {
+    if (sessions.length > 0) {
+      saveSessionsToStorage(sessions);
+    }
+  }, [sessions]);
+
+  // 保存当前会话ID
+  useEffect(() => {
+    saveCurrentSessionToStorage(sessionId);
+  }, [sessionId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -62,6 +165,76 @@ function App() {
     setExpandedSources(new Set());
   };
 
+  // 保存当前会话的消息到sessions中
+  const saveCurrentSession = () => {
+    if (sessionId && messages.length > 0) {
+      setSessions(prevSessions => {
+        const existingSessionIndex = prevSessions.findIndex(s => s.id === sessionId);
+        if (existingSessionIndex >= 0) {
+          // 更新现有会话
+          const updatedSessions = [...prevSessions];
+          updatedSessions[existingSessionIndex] = {
+            ...updatedSessions[existingSessionIndex],
+            messages: [...messages],
+            timestamp: new Date()
+          };
+          return updatedSessions;
+        } else {
+          // 创建新会话（如果不存在）
+          const firstUserMessage = messages.find(m => m.isUser);
+          const title = firstUserMessage ? 
+            (firstUserMessage.text.length > 30 ? 
+              firstUserMessage.text.substring(0, 30) + '...' : 
+              firstUserMessage.text) : 
+            '新对话';
+          
+          return [{
+            id: sessionId,
+            title,
+            timestamp: new Date(),
+            messages: [...messages]
+          }, ...prevSessions];
+        }
+      });
+    }
+  };
+
+  const toggleSidebar = () => {
+    setSidebarExpanded(!sidebarExpanded);
+  };
+
+  const handleSidebarMouseEnter = () => {
+    setSidebarHovered(true);
+  };
+
+  const handleSidebarMouseLeave = () => {
+    setSidebarHovered(false);
+  };
+
+  const createNewSession = () => {
+    // 保存当前会话
+    saveCurrentSession();
+    
+    const newSessionId = Date.now().toString();
+    clearSession();
+    setSessionId(newSessionId);
+    setSidebarExpanded(false);
+  };
+
+  const switchToSession = (targetSessionId: string) => {
+    // 保存当前会话
+    saveCurrentSession();
+    
+    // 切换到目标会话
+    const targetSession = sessions.find(s => s.id === targetSessionId);
+    if (targetSession) {
+      setSessionId(targetSessionId);
+      setMessages(targetSession.messages);
+      setIsExpanded(targetSession.messages.length > 0);
+    }
+    setSidebarExpanded(false);
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
@@ -69,6 +242,13 @@ function App() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || isLoading) return;
+
+    // 如果没有当前会话ID，创建新会话
+    let currentSessionId = sessionId;
+    if (!currentSessionId) {
+      currentSessionId = Date.now().toString();
+      setSessionId(currentSessionId);
+    }
 
     // 添加用户消息
     const userMessage: Message = {
@@ -195,10 +375,70 @@ function App() {
     } finally {
       setIsLoading(false);
     }
+    
+    // 保存当前会话（延迟执行以确保消息已更新）
+    setTimeout(() => {
+      saveCurrentSession();
+    }, 100);
   };
 
   return (
     <div className={`app ${isExpanded ? "expanded" : "collapsed"}`}>
+      {/* 侧边栏悬停触发区域 */}
+      <div 
+        className="sidebar-hover-zone"
+        onMouseEnter={handleSidebarMouseEnter}
+        onMouseLeave={handleSidebarMouseLeave}
+      />
+      
+      {/* Linear风格会话管理侧边栏 */}
+      <div className={`linear-sidebar ${sidebarExpanded ? 'expanded' : ''} ${sidebarHovered ? 'hovered' : ''}`}>
+        {/* 侧边栏触发器 */}
+        <div 
+          className="sidebar-trigger"
+          onClick={toggleSidebar}
+          onMouseEnter={handleSidebarMouseEnter}
+          onMouseLeave={handleSidebarMouseLeave}
+        >
+          <div className="trigger-arrow">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M4 2L8 6L4 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        </div>
+        
+        {/* 侧边栏内容 */}
+        <div className="sidebar-content">
+          <div className="sidebar-header">
+            <h3 className="sidebar-title">会话管理</h3>
+            <button className="new-session-btn" onClick={createNewSession}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2V14M2 8H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              新对话
+            </button>
+          </div>
+          
+          <div className="sessions-list">
+            {sessions.length === 0 ? (
+              <div className="empty-sessions">
+                <p>暂无会话记录</p>
+              </div>
+            ) : (
+              sessions.map((session) => (
+                <div 
+                  key={session.id} 
+                  className={`session-item ${sessionId === session.id ? 'active' : ''}`}
+                  onClick={() => switchToSession(session.id)}
+                >
+                  <div className="session-title">{session.title}</div>
+                  <div className="session-time">{session.timestamp.toLocaleDateString()}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
       {!isExpanded ? (
         // 折叠状态 - 初始界面
         <div className="initial-screen">
@@ -243,15 +483,6 @@ function App() {
             <div className="header-left">
               <h1 className="chat-title">HAG</h1>
               <p className="chat-subtitle">智能知识问答助手</p>
-            </div>
-            <div className="header-right">
-              <button
-                onClick={clearSession}
-                className="clear-session-button"
-                title="开始新对话"
-              >
-                新对话
-              </button>
             </div>
           </div>
 

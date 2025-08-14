@@ -378,6 +378,254 @@ body {
   line-height: 1.4;
 }
 
+/* Linear风格会话管理侧边栏 */
+.linear-sidebar {
+  position: fixed;
+  top: 0;
+  left: -20px;
+  height: 100vh;
+  width: 320px;
+  background: linear-gradient(135deg, rgba(10, 10, 10, 0.95) 0%, rgba(17, 17, 17, 0.95) 50%, rgba(15, 15, 15, 0.95) 100%);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid var(--border-color);
+  transform: translateX(-280px);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1000;
+  box-shadow: 0 0 40px rgba(139, 92, 246, 0.1);
+}
+
+.linear-sidebar.hovered {
+  transform: translateX(-270px);
+}
+
+.linear-sidebar.expanded {
+  transform: translateX(0px);
+  box-shadow: 0 0 60px rgba(139, 92, 246, 0.2);
+}
+
+/* 侧边栏触发器 - 长方形设计 */
+.sidebar-trigger {
+  position: absolute;
+  top: 50%;
+  right: -40px;
+  width: 40px;
+  height: 60px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+  z-index: 999;
+  border-radius: 0 12px 12px 0;
+}
+
+/* 触发器背景层 */
+.sidebar-trigger::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-purple-dark) 100%);
+  opacity: 0.9;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 0 12px 12px 0;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+}
+
+/* 悬停在侧边栏左侧边缘时显示触发器 */
+.sidebar-hover-zone {
+  position: fixed;
+  top: 0;
+  left: -20px;
+  width: 40px;
+  height: 100vh;
+  z-index: 999;
+  background: transparent;
+}
+
+.sidebar-hover-zone:hover + .linear-sidebar .sidebar-trigger,
+.linear-sidebar:hover .sidebar-trigger {
+  opacity: 1;
+}
+
+.sidebar-hover-zone:hover + .linear-sidebar .sidebar-trigger::before,
+.linear-sidebar:hover .sidebar-trigger::before {
+  opacity: 1;
+  box-shadow: var(--shadow-glow);
+}
+
+/* 侧边栏触发器悬停效果 */
+.sidebar-trigger:hover {
+  transform: translateY(-50%) scale(1.2);
+  transform-origin: left center;
+}
+
+.sidebar-trigger:hover::before {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.6), 0 0 20px rgba(139, 92, 246, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.sidebar-trigger:hover .trigger-arrow {
+  color: rgba(139, 92, 246, 0.9);
+}
+
+
+
+.trigger-arrow {
+  color: white;
+  transition: var(--transition);
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.linear-sidebar.expanded .trigger-arrow {
+  transform: rotate(180deg);
+}
+
+/* 侧边栏内容 */
+.sidebar-content {
+  height: 100%;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out 0.1s;
+}
+
+.linear-sidebar.expanded .sidebar-content {
+  opacity: 1;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.new-session-btn {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.new-session-btn:hover {
+  background: var(--accent-purple);
+  border-color: var(--accent-purple);
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-1px);
+}
+
+.new-session-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* 会话列表 */
+.sessions-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sessions-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sessions-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sessions-list::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
+
+.empty-sessions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.session-item {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: var(--transition);
+  backdrop-filter: blur(10px);
+}
+
+.session-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--accent-purple);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-subtle);
+}
+
+.session-item.active {
+  background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-purple-dark) 100%);
+  border-color: var(--accent-purple);
+  box-shadow: var(--shadow-glow);
+}
+
+.session-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-time {
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+.session-item.active .session-time {
+  color: rgba(255, 255, 255, 0.8);
+}
+
 /* 输入区域 */
 .input-container {
   padding: 24px;
