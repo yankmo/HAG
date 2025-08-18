@@ -56,12 +56,16 @@ HAG (Hybrid Augmented Generation) is an advanced knowledge-enhanced generation f
 *LINEAR style frontend interface*
 
 ### 2. Retrieval Effects
-![HAG Retrieval Effects](./docs/images/NewSearch.png)
+![HAG Retrieval Effects](./docs/images/Newanswer.png)
 *Hybrid retrieval workflow demonstration, integrating vector database and knowledge graph*
 
 ### 3. Final Answer
-![HAG Final Answer](./docs/images/Newanswer.png)
+![HAG Final Answer](./docs/images/New.png)
 *Intelligent Q&A result display with complete knowledge sources and reasoning process*
+
+### 4. Session Management
+![HAG Session Management](./docs/images/session.png)
+*Session-based conversation management with persistent history*
 
 ## 📦 Installation
 

@@ -498,10 +498,12 @@ body {
 .sidebar-content {
   height: 100%;
   padding: 24px;
+  padding-bottom: 100px; /* 为底部按钮留出空间 */
   display: flex;
   flex-direction: column;
   opacity: 0;
   transition: opacity 0.3s ease-in-out 0.1s;
+  position: relative;
 }
 
 .linear-sidebar.expanded .sidebar-content {
@@ -510,11 +512,12 @@ body {
 
 .sidebar-header {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
   margin-bottom: 24px;
   padding-bottom: 16px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .sidebar-title {
@@ -522,6 +525,8 @@ body {
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.02em;
+  text-align: center;
+  margin: 0;
 }
 
 .new-session-btn {
@@ -559,6 +564,7 @@ body {
   flex-direction: column;
   gap: 8px;
   padding: 3px;
+  margin-bottom: 20px; /* 与底部按钮保持距离 */
 }
 
 .sessions-list::-webkit-scrollbar {
@@ -588,9 +594,18 @@ body {
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
   padding: 12px 16px;
-  cursor: pointer;
   transition: var(--transition);
   backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.session-content {
+  flex: 1;
+  cursor: pointer;
+  min-width: 0;
 }
 
 .session-item:hover {
@@ -625,6 +640,87 @@ body {
 
 .session-item.active .session-time {
   color: rgba(255, 255, 255, 0.8);
+}
+
+/* 删除会话按钮 */
+.delete-session-btn {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  color: var(--text-secondary);
+  padding: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.9);
+  flex-shrink: 0;
+}
+
+.session-item:hover .delete-session-btn {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.delete-session-btn:hover {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: white;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+  transform: translateY(-1px) scale(1.05);
+}
+
+.delete-session-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* 侧边栏底部 */
+.sidebar-footer {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  right: 24px;
+}
+
+.new-session-btn-bottom {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  color: var(--text-primary);
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.new-session-btn-bottom:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.9);
+  color: var(--bg-primary);
+  box-shadow: 0 8px 30px rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.new-session-btn-bottom svg {
+  width: 16px;
+  height: 16px;
+  transition: all 0.3s ease;
+}
+
+.new-session-btn-bottom:hover svg {
+  color: var(--bg-primary);
 }
 
 /* 输入区域 */

@@ -112,22 +112,25 @@ function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 初始化加载会话数据
-  useEffect(() => {
-    const loadedSessions = loadSessionsFromStorage();
-    setSessions(loadedSessions);
-    
-    const currentSessionId = loadCurrentSessionFromStorage();
-    if (currentSessionId && loadedSessions.length > 0) {
-      const currentSession = loadedSessions.find(s => s.id === currentSessionId);
-      if (currentSession) {
-        setSessionId(currentSessionId);
-        setMessages(currentSession.messages);
-        if (currentSession.messages.length > 0) {
-          setIsExpanded(true);
-        }
-      }
+  // 清除所有会话缓存数据
+  const clearAllSessions = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.SESSIONS);
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+      setSessions([]);
+      setSessionId(null);
+      setMessages([]);
+      setIsExpanded(false);
+      setExpandedSources(new Set());
+      console.log('所有会话缓存已清除');
+    } catch (error) {
+      console.error('清除会话缓存失败:', error);
     }
+  };
+
+  // 初始化时清除所有会话数据
+  useEffect(() => {
+    clearAllSessions();
   }, []);
 
   // 保存会话数据到localStorage
@@ -219,6 +222,23 @@ function App() {
     clearSession();
     setSessionId(newSessionId);
     setSidebarExpanded(false);
+  };
+
+  const deleteSession = (sessionIdToDelete: string) => {
+    // 从会话列表中删除指定会话
+    setSessions(prevSessions => {
+      const updatedSessions = prevSessions.filter(s => s.id !== sessionIdToDelete);
+      
+      // 如果删除的是当前会话，清空当前会话
+      if (sessionId === sessionIdToDelete) {
+        setMessages([]);
+        setSessionId(null);
+        setIsExpanded(false);
+        setExpandedSources(new Set());
+      }
+      
+      return updatedSessions;
+    });
   };
 
   const switchToSession = (targetSessionId: string) => {
@@ -411,12 +431,6 @@ function App() {
         <div className="sidebar-content">
           <div className="sidebar-header">
             <h3 className="sidebar-title">会话管理</h3>
-            <button className="new-session-btn" onClick={createNewSession}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2V14M2 8H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              新对话
-            </button>
           </div>
           
           <div className="sessions-list">
@@ -429,13 +443,36 @@ function App() {
                 <div 
                   key={session.id} 
                   className={`session-item ${sessionId === session.id ? 'active' : ''}`}
-                  onClick={() => switchToSession(session.id)}
                 >
-                  <div className="session-title">{session.title}</div>
-                  <div className="session-time">{session.timestamp.toLocaleDateString()}</div>
+                  <div className="session-content" onClick={() => switchToSession(session.id)}>
+                    <div className="session-title">{session.title}</div>
+                    <div className="session-time">{session.timestamp.toLocaleDateString()}</div>
+                  </div>
+                  <button 
+                    className="delete-session-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteSession(session.id);
+                    }}
+                    title="删除会话"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M9 3L3 9M3 3L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
+                  </button>
                 </div>
               ))
             )}
+          </div>
+          
+          {/* 底部悬浮新对话按钮 */}
+          <div className="sidebar-footer">
+            <button className="new-session-btn-bottom" onClick={createNewSession}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2V14M2 8H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              新对话
+            </button>
           </div>
         </div>
       </div>
