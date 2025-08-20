@@ -34,15 +34,22 @@ HAG (Hybrid Augmented Generation) is an advanced knowledge-enhanced generation f
 - **Knowledge Graph**: Neo4j enables complex relationship reasoning and entity discovery
 - **Hybrid Retrieval**: Intelligent fusion of two data sources ensuring retrieval accuracy and completeness
 
-### 🚀 Callable API Services
-- **RESTful Interface**: Standardized API design supporting multiple programming language calls
-- **Modular Architecture**: Independent embedding, retrieval, and generation services with flexible composition
-- **LangChain Integration**: Runnable pipeline architecture supporting complex workflow orchestration
+### 📁 Document Storage Management
+- **File Upload**: Support for multiple document formats (PDF, TXT, DOCX, etc.) with drag-and-drop interface
+- **Processing Pipeline**: Real-time document processing with progress tracking and status updates
+- **Storage Statistics**: Comprehensive analytics for Neo4j entities/relationships and Weaviate vectors
+- **Retrieval Testing**: Interactive search examples with dual-database query capabilities
 
-### 🎨 LINEAR Style Frontend Design
+### 🚀 Full-Stack Web Application
+- **React Frontend**: Modern React-based user interface with responsive design
+- **FastAPI Backend**: High-performance API server with comprehensive endpoint coverage
+- **Real-time Updates**: Live progress monitoring and instant feedback for all operations
+- **Session Management**: Persistent conversation history and user session handling
+
+### 🎨 LINEAR Style Design
 - **Modern Interface**: Clean and elegant user experience following LINEAR design principles
-- **Real-time Feedback**: Streaming response display with instant status updates
-- **Intelligent Interaction**: Intuitive chat interface supporting multi-turn conversations and history
+- **Dark Theme**: Professional dark mode interface with consistent styling
+- **Intuitive Navigation**: Streamlined sidebar navigation with clear feature organization
 
 ## System Architecture
 
@@ -71,6 +78,7 @@ HAG (Hybrid Augmented Generation) is an advanced knowledge-enhanced generation f
 
 ### Prerequisites
 - Python 3.8 or higher
+- Node.js 16+ and npm
 - Docker and Docker Compose
 - Git
 
@@ -82,12 +90,19 @@ git clone https://github.com/yankmo/HAG.git
 cd HAG
 ```
 
-2. **Install Dependencies**
+2. **Install Backend Dependencies**
 ```bash
 pip install -r requirements.txt
 ```
 
-3. **Start Required Services**
+3. **Install Frontend Dependencies**
+```bash
+cd frontend
+npm install
+cd ..
+```
+
+4. **Start Required Services**
 ```bash
 # Start Neo4j
 docker run -d --name neo4j \
@@ -108,21 +123,27 @@ docker run -d --name ollama \
   ollama/ollama:latest
 ```
 
-4. **Configure System**
+5. **Configure System**
 ```bash
 # Edit configuration file
 cp config/config.yaml.example config/config.yaml
 # Update database credentials and service URLs
 ```
 
-5. **Run Application**
+6. **Start the Application**
 ```bash
-# Start Web Interface
-streamlit run app_simple.py
+# Terminal 1: Start Backend API Server
+python backend_api.py
 
-# Or use API directly
-python api.py
+# Terminal 2: Start Frontend Development Server
+cd frontend
+npm start
 ```
+
+7. **Access the Application**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Documentation: http://localhost:8000/docs
 
 ## 🔧 Configuration
 
@@ -149,12 +170,41 @@ weaviate:
 ## 🧪 Usage Examples
 
 ### Web Interface
-```bash
-streamlit run app_simple.py
-```
-Navigate to `http://localhost:8501` and start asking questions!
+Access the full-featured web application at `http://localhost:3000` after starting both backend and frontend servers.
+
+**Main Features:**
+- **Chat Interface**: Ask questions and get intelligent responses
+- **Document Upload**: Upload and process documents for knowledge base expansion
+- **Storage Management**: Monitor processing progress and view storage statistics
+- **Retrieval Testing**: Test search capabilities across Neo4j and Weaviate databases
 
 ### API Usage
+```python
+import requests
+
+# Query the HAG system
+response = requests.post("http://localhost:8000/query", json={
+    "query": "What are the symptoms of Parkinson's disease?",
+    "session_id": "user_session_123"
+})
+result = response.json()
+print(result["response"])
+
+# Upload a document
+with open("document.pdf", "rb") as f:
+    files = {"file": f}
+    response = requests.post("http://localhost:8000/storage/upload", files=files)
+    upload_result = response.json()
+    print(f"Task ID: {upload_result['task_id']}")
+
+# Check processing progress
+task_id = upload_result["task_id"]
+response = requests.get(f"http://localhost:8000/storage/progress/{task_id}")
+progress = response.json()
+print(f"Progress: {progress['progress']}%")
+```
+
+### Direct Service Access
 ```python
 from api import HAGIntegratedAPI
 
@@ -164,15 +214,30 @@ hag = HAGIntegratedAPI()
 # Ask questions
 response = hag.runnable_chain.invoke("What are the symptoms of Parkinson's disease?")
 print(response)
-```
-
-### Direct Service Access
-```python
-from src.services import HybridRetrievalService
 
 # Use hybrid retrieval directly
+from src.services import HybridRetrievalService
 hybrid_service = HybridRetrievalService(...)
 results = hybrid_service.search("medical query", limit=5)
+```
+
+### Storage Management
+```python
+# Get storage statistics
+response = requests.get("http://localhost:8000/storage/stats")
+stats = response.json()
+print(f"Total documents: {stats['total_documents']}")
+print(f"Neo4j entities: {stats['neo4j_stats']['entities']}")
+print(f"Weaviate vectors: {stats['weaviate_stats']['vectors']}")
+
+# Test retrieval capabilities
+response = requests.post("http://localhost:8000/storage/search/test", json={
+    "query": "artificial intelligence",
+    "search_type": "both"  # Options: "neo4j", "weaviate", "both"
+})
+search_results = response.json()
+print("Neo4j results:", search_results["neo4j_results"])
+print("Weaviate results:", search_results["weaviate_results"])
 ```
 
 ## 🧪 Testing
