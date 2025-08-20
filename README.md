@@ -74,6 +74,18 @@ HAG (Hybrid Augmented Generation) is an advanced knowledge-enhanced generation f
 ![HAG Session Management](./docs/images/session.png)
 *Session-based conversation management with persistent history*
 
+### 5. Storage Management
+![HAG Storage Management](./docs/images/storage.png)
+*Document storage management with upload, processing, and retrieval features*
+
+### 6. Retrieval Testing
+![HAG Retrieval Testing](./docs/images/searchtemplate.png)
+*Interactive search example with dual-database query capabilities*
+
+### 7. Neo4j Example
+![HAG Neo4j Example](./docs/images/neo4j.png)
+*Neo4j knowledge graph generation example, showing entity relationships and inference paths*
+
 ## 📦 Installation
 
 ### Prerequisites

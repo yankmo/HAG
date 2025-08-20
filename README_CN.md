@@ -2,14 +2,14 @@
 
 <div align="center">
 
-[!\[GitHub stars\](https://img.shields.io/github/stars/yankmo/HAG?style=social null)](https://github.com/yankmo/HAG)
-[!\[GitHub forks\](https://img.shields.io/github/forks/yankmo/HAG?style=social null)](https://github.com/yankmo/HAG)
-[!\[GitHub issues\](https://img.shields.io/github/issues/yankmo/HAG null)](https://github.com/yankmo/HAG/issues)
-[!\[GitHub license\](https://img.shields.io/github/license/yankmo/HAG null)](https://github.com/yankmo/HAG/blob/main/LICENSE)
-[!\[Python\](https://img.shields.io/badge/Python-3.8+-blue.svg null)](https://www.python.org/downloads/)
-[!\[LangChain\](https://img.shields.io/badge/LangChain-0.1.0-green.svg null)](https://langchain.com/)
-[!\[Neo4j\](https://img.shields.io/badge/Neo4j-5.0+-red.svg null)](https://neo4j.com/)
-[!\[Weaviate\](https://img.shields.io/badge/Weaviate-1.20+-orange.svg null)](https://weaviate.io/)
+[![GitHub stars](https://img.shields.io/github/stars/yankmo/HAG?style=social)](https://github.com/yankmo/HAG)
+[![GitHub forks](https://img.shields.io/github/forks/yankmo/HAG?style=social)](https://github.com/yankmo/HAG)
+[![GitHub issues](https://img.shields.io/github/issues/yankmo/HAG)](https://github.com/yankmo/HAG/issues)
+[![GitHub license](https://img.shields.io/github/license/yankmo/HAG)](https://github.com/yankmo/HAG/blob/main/LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![LangChain](https://img.shields.io/badge/LangChain-0.1.0-green.svg)](https://langchain.com/)
+[![Neo4j](https://img.shields.io/badge/Neo4j-5.0+-red.svg)](https://neo4j.com/)
+[![Weaviate](https://img.shields.io/badge/Weaviate-1.20+-orange.svg)](https://weaviate.io/)
 
 [English](README.md) | [中文](README_CN.md)
 
@@ -69,25 +69,45 @@ HAG（混合增强生成）是一个先进的知识增强生成框架，结合�
 
 ## 系统架构
 
-!\[工作流程]\(./docs/images/black.svg null)
+![Workflow](./docs/images/black.svg)
 *What is HAG*
 
 ## 📸 效果展示
 
 ### 1. Web 界面
 
-!\[HAG Web 界面]\(./docs/images/Newapp.png null)
+![HAG Web Interface](./docs/images/Newapp.png)
 *LINEAR设计风格前端界面*
 
 ### 2. 检索效果
 
-!\[HAG 检索效果]\(./docs/images/NewSearch.png null)
+![HAG Retrieval Effect](./docs/images/NewSearch.png)
 *混合检索工作流程展示，融合向量数据库和知识图谱*
 
 ### 3. 最终回答
 
-!\[HAG 最终回答]\(./docs/images/Newanswer.png null)
+![HAG Final Answer](./docs/images/Newanswer.png)
 *智能问答结果展示，包含完整的知识来源和推理过程*
+
+### 4. 会话管理
+
+![HAG Session Management](./docs/images/session.png)
+*会话基于的对话管理，支持持久化历史记录*
+
+### 5. 存储管理
+
+![HAG Storage Management](./docs/images/storage.png)
+*文档上传和处理流水线展示，包括进度监控和状态更新*
+
+### 6. 检索测试
+
+![HAG Retrieval Test](./docs/images/searchtemplate.png)
+*交互式搜索示例，支持双数据库查询功能*
+
+### 7. Neo4j生成样例
+
+![HAG Neo4j Example](./docs/images/neo4j.png)
+*Neo4j知识图谱生成示例，展示实体关系和推理路径*
 
 ## 📦 安装
 
