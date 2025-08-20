@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, FormEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getApiUrl, default as API_CONFIG } from "./config/api";
+import StorageManager from "./components/StorageManager";
 import "./App.css";
 
 interface Message {
@@ -57,25 +58,7 @@ const saveSessionsToStorage = (sessions: Session[]) => {
   }
 };
 
-const loadSessionsFromStorage = (): Session[] => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEYS.SESSIONS);
-    if (!stored) return [];
-    
-    const parsed = JSON.parse(stored);
-    return parsed.map((session: any) => ({
-      ...session,
-      timestamp: new Date(session.timestamp),
-      messages: session.messages.map((msg: any) => ({
-        ...msg,
-        timestamp: new Date(msg.timestamp)
-      }))
-    }));
-  } catch (error) {
-    console.error('加载会话数据失败:', error);
-    return [];
-  }
-};
+
 
 const saveCurrentSessionToStorage = (sessionId: string | null) => {
   try {
@@ -89,14 +72,7 @@ const saveCurrentSessionToStorage = (sessionId: string | null) => {
   }
 };
 
-const loadCurrentSessionFromStorage = (): string | null => {
-  try {
-    return localStorage.getItem(STORAGE_KEYS.CURRENT_SESSION);
-  } catch (error) {
-    console.error('加载当前会话ID失败:', error);
-    return null;
-  }
-};
+
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -110,6 +86,7 @@ function App() {
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [sidebarHovered, setSidebarHovered] = useState(false);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [showStorageModal, setShowStorageModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // 清除所有会话缓存数据
@@ -465,8 +442,14 @@ function App() {
             )}
           </div>
           
-          {/* 底部悬浮新对话按钮 */}
+          {/* 底部功能按钮区域 */}
           <div className="sidebar-footer">
+            <button className="storage-btn-bottom" onClick={() => setShowStorageModal(true)}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M2 3h12l-1 10H3L2 3zM2 3l-1-2h3m0 0h8m-8 0v1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              存储管理
+            </button>
             <button className="new-session-btn-bottom" onClick={createNewSession}>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M8 2V14M2 8H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -740,6 +723,12 @@ function App() {
           </div>
         </div>
       )}
+      
+      {/* 存储管理模态框 */}
+      <StorageManager 
+        isOpen={showStorageModal} 
+        onClose={() => setShowStorageModal(false)} 
+      />
     </div>
   );
 }

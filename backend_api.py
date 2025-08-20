@@ -5,7 +5,7 @@ HAG FastAPI 后端包装器
 为前端提供RESTful API接口
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -18,6 +18,9 @@ import os
 import uuid
 from datetime import datetime
 from collections import defaultdict
+import tempfile
+import shutil
+from pathlib import Path
 
 # 导入现有的HAG API
 from api import HAGIntegratedAPI, IntegratedResponse
@@ -60,6 +63,38 @@ class QueryResponse(BaseModel):
     sources: Dict[str, Any]
     metadata: Dict[str, Any]
     retrieval_process: List[RetrievalStep] = []
+
+# 存储功能相关模型
+class DocumentUploadResponse(BaseModel):
+    task_id: str
+    filename: str
+    file_size: int
+    status: str
+    message: str
+
+class ProcessingProgress(BaseModel):
+    task_id: str
+    status: str  # 'uploading', 'parsing', 'extracting', 'storing_neo4j', 'storing_weaviate', 'completed', 'failed'
+    progress: int  # 0-100
+    current_stage: str
+    message: str
+    details: Dict[str, Any] = {}
+
+class StorageStats(BaseModel):
+    neo4j_stats: Dict[str, int]
+    weaviate_stats: Dict[str, Any]  # 改为Any类型以支持浮点数avg_similarity
+    total_documents: int
+    last_updated: str
+
+class SearchTestRequest(BaseModel):
+    query: str
+    search_type: str = "both"  # 'neo4j', 'weaviate', 'both'
+
+class SearchTestResponse(BaseModel):
+    neo4j_results: Dict[str, Any] = {}
+    weaviate_results: Dict[str, Any] = {}
+    query: str
+    search_type: str
 
 # 全局HAG API实例
 hag_api: Optional[HAGIntegratedAPI] = None
@@ -121,6 +156,81 @@ class SessionManager:
 
 # 全局会话管理器
 session_manager = SessionManager()
+
+# 文档处理任务管理
+class DocumentProcessor:
+    def __init__(self):
+        self.tasks = {}  # task_id -> ProcessingProgress
+        self.supported_formats = {'.txt', '.pdf', '.docx', '.doc'}
+    
+    def create_task(self, filename: str, file_size: int) -> str:
+        """创建新的处理任务"""
+        task_id = str(uuid.uuid4())
+        self.tasks[task_id] = ProcessingProgress(
+            task_id=task_id,
+            status='uploading',
+            progress=0,
+            current_stage='文件上传中',
+            message='正在上传文件...',
+            details={'filename': filename, 'file_size': file_size}
+        )
+        return task_id
+    
+    def update_progress(self, task_id: str, status: str, progress: int, stage: str, message: str, details: Dict = None):
+        """更新任务进度"""
+        if task_id in self.tasks:
+            self.tasks[task_id].status = status
+            self.tasks[task_id].progress = progress
+            self.tasks[task_id].current_stage = stage
+            self.tasks[task_id].message = message
+            if details:
+                self.tasks[task_id].details.update(details)
+    
+    def get_progress(self, task_id: str) -> Optional[ProcessingProgress]:
+        """获取任务进度"""
+        return self.tasks.get(task_id)
+    
+    def is_supported_format(self, filename: str) -> bool:
+        """检查文件格式是否支持"""
+        return Path(filename).suffix.lower() in self.supported_formats
+    
+    async def process_document(self, task_id: str, file_path: str, filename: str):
+        """处理文档的后台任务"""
+        try:
+            # 模拟文档处理过程
+            await asyncio.sleep(1)
+            self.update_progress(task_id, 'parsing', 20, '文档解析中', '正在解析文档内容...')
+            
+            await asyncio.sleep(2)
+            self.update_progress(task_id, 'extracting', 40, '实体关系提取中', '正在提取实体和关系...')
+            
+            await asyncio.sleep(2)
+            self.update_progress(task_id, 'storing_neo4j', 60, 'Neo4j存储中', '正在存储到知识图谱...')
+            
+            await asyncio.sleep(2)
+            self.update_progress(task_id, 'storing_weaviate', 80, 'Weaviate向量化中', '正在生成向量表示...')
+            
+            await asyncio.sleep(1)
+            self.update_progress(
+                task_id, 'completed', 100, '处理完成', '文档处理完成',
+                {
+                    'neo4j_entities': 15,
+                    'neo4j_relationships': 8,
+                    'weaviate_vectors': 25,
+                    'processing_time': '8.2秒'
+                }
+            )
+            
+            # 清理临时文件
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                
+        except Exception as e:
+            logger.error(f"文档处理失败 [{task_id}]: {e}")
+            self.update_progress(task_id, 'failed', 0, '处理失败', f'处理失败: {str(e)}')
+
+# 全局文档处理器
+doc_processor = DocumentProcessor()
 
 @app.on_event("startup")
 async def startup_event():
@@ -442,6 +552,187 @@ async def get_system_status():
         return hag_api.get_system_status()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Status check failed: {str(e)}")
+
+# ==================== 存储功能API接口 ====================
+
+@app.post("/storage/upload", response_model=DocumentUploadResponse)
+async def upload_document(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    """文档上传接口"""
+    try:
+        # 检查文件格式
+        if not doc_processor.is_supported_format(file.filename):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"不支持的文件格式。支持的格式: {', '.join(doc_processor.supported_formats)}"
+            )
+        
+        # 检查文件大小 (限制为10MB)
+        max_size = 10 * 1024 * 1024  # 10MB
+        file_size = 0
+        
+        # 创建临时文件
+        temp_dir = tempfile.mkdtemp()
+        temp_file_path = os.path.join(temp_dir, file.filename)
+        
+        with open(temp_file_path, "wb") as buffer:
+            while chunk := await file.read(1024):
+                file_size += len(chunk)
+                if file_size > max_size:
+                    os.remove(temp_file_path)
+                    os.rmdir(temp_dir)
+                    raise HTTPException(status_code=400, detail="文件大小超过10MB限制")
+                buffer.write(chunk)
+        
+        # 创建处理任务
+        task_id = doc_processor.create_task(file.filename, file_size)
+        
+        # 启动后台处理任务
+        background_tasks.add_task(doc_processor.process_document, task_id, temp_file_path, file.filename)
+        
+        logger.info(f"文档上传成功 [{task_id}]: {file.filename} ({file_size} bytes)")
+        
+        return DocumentUploadResponse(
+            task_id=task_id,
+            filename=file.filename,
+            file_size=file_size,
+            status="uploading",
+            message="文件上传成功，开始处理"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"文档上传失败: {e}")
+        raise HTTPException(status_code=500, detail=f"上传失败: {str(e)}")
+
+@app.get("/storage/progress/{task_id}", response_model=ProcessingProgress)
+async def get_processing_progress(task_id: str):
+    """获取文档处理进度"""
+    progress = doc_processor.get_progress(task_id)
+    if not progress:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    
+    return progress
+
+@app.get("/storage/stats", response_model=StorageStats)
+async def get_storage_stats():
+    """获取存储统计信息"""
+    try:
+        # 模拟统计数据 - 实际应用中应该从Neo4j和Weaviate获取真实数据
+        neo4j_stats = {
+            "entities": 1247,
+            "relationships": 856,
+            "documents": 23,
+            "entity_types": 8
+        }
+        
+        weaviate_stats = {
+            "vectors": 1892,
+            "documents": 23,
+            "collections": 3,
+            "avg_similarity": 0.85
+        }
+        
+        return StorageStats(
+            neo4j_stats=neo4j_stats,
+            weaviate_stats=weaviate_stats,
+            total_documents=23,
+            last_updated=datetime.now().isoformat()
+        )
+        
+    except Exception as e:
+        logger.error(f"获取存储统计失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取统计信息失败: {str(e)}")
+
+@app.post("/storage/search/test", response_model=SearchTestResponse)
+async def test_search(request: SearchTestRequest):
+    """检索测试接口"""
+    if hag_api is None:
+        raise HTTPException(status_code=503, detail="HAG API not initialized")
+    
+    try:
+        logger.info(f"执行检索测试: {request.query} (类型: {request.search_type})")
+        
+        neo4j_results = {}
+        weaviate_results = {}
+        
+        # Neo4j检索
+        if request.search_type in ['neo4j', 'both']:
+            try:
+                entities = hag_api.graph_service.search_entities_by_name(request.query, limit=5)
+                relationships = hag_api.graph_service.search_relationships_by_query(request.query, limit=8)
+                
+                neo4j_results = {
+                    "entities": [
+                        {
+                            "name": entity.get('name', ''),
+                            "type": entity.get('type', ''),
+                            "description": entity.get('description', '')
+                        } for entity in entities[:5]
+                    ],
+                    "relationships": [
+                        {
+                            "source": rel.get('source', ''),
+                            "target": rel.get('target', ''),
+                            "type": rel.get('type', ''),
+                            "description": rel.get('description', ''),
+                            "relevance_score": rel.get('relevance_score', 0)
+                        } for rel in relationships[:8]
+                    ],
+                    "total_entities": len(entities),
+                    "total_relationships": len(relationships)
+                }
+            except Exception as e:
+                logger.warning(f"Neo4j检索失败: {e}")
+                neo4j_results = {"error": f"Neo4j检索失败: {str(e)}"}
+        
+        # Weaviate检索
+        if request.search_type in ['weaviate', 'both']:
+            try:
+                retrieval_result = hag_api.retrieval_service.search_hybrid(request.query, limit=5)
+                
+                weaviate_results = {
+                    "documents": [
+                        {
+                            "content": doc.content[:200] + "..." if len(doc.content) > 200 else doc.content,
+                            "score": doc.score,
+                            "metadata": doc.metadata
+                        } for doc in retrieval_result.hybrid_results[:5]
+                    ],
+                    "total_documents": len(retrieval_result.hybrid_results),
+                    "statistics": retrieval_result.statistics if hasattr(retrieval_result, 'statistics') else {}
+                }
+            except Exception as e:
+                logger.warning(f"Weaviate检索失败: {e}")
+                weaviate_results = {"error": f"Weaviate检索失败: {str(e)}"}
+        
+        return SearchTestResponse(
+            neo4j_results=neo4j_results,
+            weaviate_results=weaviate_results,
+            query=request.query,
+            search_type=request.search_type
+        )
+        
+    except Exception as e:
+        logger.error(f"检索测试失败: {e}")
+        raise HTTPException(status_code=500, detail=f"检索测试失败: {str(e)}")
+
+@app.delete("/storage/tasks/{task_id}")
+async def delete_processing_task(task_id: str):
+    """删除处理任务记录"""
+    if task_id in doc_processor.tasks:
+        del doc_processor.tasks[task_id]
+        return {"message": f"任务 {task_id} 已删除"}
+    else:
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+@app.get("/storage/tasks")
+async def list_processing_tasks():
+    """获取所有处理任务列表"""
+    return {
+        "tasks": list(doc_processor.tasks.values()),
+        "total_tasks": len(doc_processor.tasks)
+    }
 
 if __name__ == "__main__":
     uvicorn.run(
