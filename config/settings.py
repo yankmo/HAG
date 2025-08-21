@@ -57,6 +57,112 @@ class WeaviateConfig:
 
 
 @dataclass
+class WeightConfig:
+    """权重策略配置"""
+    # 默认权重策略
+    default_strategy: str = "static"
+    
+    # 是否启用动态权重
+    enable_dynamic_weights: bool = True
+    
+    # 是否启用异步权重计算
+    enable_async_weights: bool = False
+    
+    # 默认文档和图谱权重
+    default_doc_weight: float = 0.6
+    default_graph_weight: float = 0.4
+    
+    # 静态权重配置
+    static_weights: Dict[str, float] = field(default_factory=lambda: {
+        "document": 0.6,
+        "graph": 0.4
+    })
+    
+    # 意图驱动权重配置
+    intent_driven_config: Dict[str, Any] = field(default_factory=lambda: {
+        "factual_doc_weight": 0.7,
+        "factual_graph_weight": 0.3,
+        "analytical_doc_weight": 0.4,
+        "analytical_graph_weight": 0.6,
+        "exploratory_doc_weight": 0.3,
+        "exploratory_graph_weight": 0.7,
+        "default_doc_weight": 0.5,
+        "default_graph_weight": 0.5
+    })
+    
+    # 质量驱动权重配置
+    quality_driven_config: Dict[str, Any] = field(default_factory=lambda: {
+        "relevance_threshold": 0.7,
+        "confidence_threshold": 0.6,
+        "freshness_weight": 0.1,
+        "authority_weight": 0.2,
+        "completeness_weight": 0.3,
+        "accuracy_weight": 0.4
+    })
+    
+    # 自适应权重配置
+    adaptive_config: Dict[str, Any] = field(default_factory=lambda: {
+        "learning_rate": 0.01,
+        "momentum": 0.9,
+        "decay_factor": 0.95,
+        "min_samples": 10,
+        "update_frequency": 100
+    })
+    
+    # GNN权重配置
+    gnn_config: Dict[str, Any] = field(default_factory=lambda: {
+        "model_type": "gat",  # gat 或 gcn
+        "hidden_dim": 64,
+        "num_heads": 4,
+        "num_layers": 2,
+        "dropout": 0.1,
+        "learning_rate": 0.001,
+        "batch_size": 32,
+        "max_epochs": 100,
+        "early_stopping_patience": 10,
+        "model_save_path": "models/gnn_weights.pth",
+        "enable_training": False,
+        "training_data_size": 1000
+    })
+    
+    # 混合策略配置
+    hybrid_config: Dict[str, Any] = field(default_factory=lambda: {
+        "intent_weight": 0.3,
+        "quality_weight": 0.4,
+        "gnn_weight": 0.3,
+        "enable_normalization": True
+    })
+    
+    # 集成策略配置
+    ensemble_config: Dict[str, Any] = field(default_factory=lambda: {
+        "method": "weighted_average",  # weighted_average 或 majority_vote
+        "calculator_weights": {
+            "intent_driven": 0.25,
+            "quality_driven": 0.25,
+            "gnn_driven": 0.25,
+            "hybrid": 0.25
+        },
+        "confidence_threshold": 0.5
+    })
+    
+    # 缓存配置
+    cache_config: Dict[str, Any] = field(default_factory=lambda: {
+        "enable_cache": True,
+        "cache_size": 1000,
+        "cache_ttl": 3600,  # 秒
+        "cleanup_interval": 300  # 秒
+    })
+    
+    # 性能监控配置
+    monitoring_config: Dict[str, Any] = field(default_factory=lambda: {
+        "enable_monitoring": True,
+        "history_size": 1000,
+        "metrics_interval": 60,  # 秒
+        "log_performance": True
+    })
+
+
+@dataclass
 class AppConfig:
     """应用程序配置"""
     debug: bool = False
@@ -85,6 +191,7 @@ class ConfigManager:
         self.ollama = OllamaConfig()
         self.weaviate = WeaviateConfig()
         self.app = AppConfig()
+        self.weight = WeightConfig()
         
         # 从环境变量加载配置
         self._load_from_env()
@@ -128,6 +235,18 @@ class ConfigManager:
             self.app.debug = os.getenv('DEBUG').lower() == 'true'
         if os.getenv('LOG_LEVEL'):
             self.app.log_level = os.getenv('LOG_LEVEL')
+        
+        # 权重配置
+        if os.getenv('WEIGHT_DEFAULT_STRATEGY'):
+            self.weight.default_strategy = os.getenv('WEIGHT_DEFAULT_STRATEGY')
+        if os.getenv('WEIGHT_ENABLE_DYNAMIC'):
+            self.weight.enable_dynamic_weights = os.getenv('WEIGHT_ENABLE_DYNAMIC').lower() == 'true'
+        if os.getenv('WEIGHT_ENABLE_ASYNC'):
+            self.weight.enable_async_weights = os.getenv('WEIGHT_ENABLE_ASYNC').lower() == 'true'
+        if os.getenv('WEIGHT_DEFAULT_DOC'):
+            self.weight.default_doc_weight = float(os.getenv('WEIGHT_DEFAULT_DOC'))
+        if os.getenv('WEIGHT_DEFAULT_GRAPH'):
+            self.weight.default_graph_weight = float(os.getenv('WEIGHT_DEFAULT_GRAPH'))
     
     def _load_from_file(self):
         """从配置文件加载配置"""
@@ -165,6 +284,13 @@ class ConfigManager:
                 for key, value in app_data.items():
                     if hasattr(self.app, key):
                         setattr(self.app, key, value)
+            
+            # 更新权重配置
+            if 'weight' in config_data:
+                weight_data = config_data['weight']
+                for key, value in weight_data.items():
+                    if hasattr(self.weight, key):
+                        setattr(self.weight, key, value)
                         
         except Exception as e:
             import logging
@@ -197,6 +323,22 @@ class ConfigManager:
                 'max_chunk_size': self.app.max_chunk_size,
                 'chunk_overlap': self.app.chunk_overlap,
                 'max_results': self.app.max_results
+            },
+            'weight': {
+                'default_strategy': self.weight.default_strategy,
+                'enable_dynamic_weights': self.weight.enable_dynamic_weights,
+                'enable_async_weights': self.weight.enable_async_weights,
+                'default_doc_weight': self.weight.default_doc_weight,
+                'default_graph_weight': self.weight.default_graph_weight,
+                'static_weights': self.weight.static_weights,
+                'intent_driven_config': self.weight.intent_driven_config,
+                'quality_driven_config': self.weight.quality_driven_config,
+                'adaptive_config': self.weight.adaptive_config,
+                'gnn_config': self.weight.gnn_config,
+                'hybrid_config': self.weight.hybrid_config,
+                'ensemble_config': self.weight.ensemble_config,
+                'cache_config': self.weight.cache_config,
+                'monitoring_config': self.weight.monitoring_config
             }
         }
         

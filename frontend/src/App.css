@@ -399,7 +399,7 @@ body {
 }
 
 .linear-sidebar.expanded {
-  transform: translateX(0px);
+  transform: translateX(20px);
   box-shadow: 0 0 60px rgba(139, 92, 246, 0.2);
 }
 

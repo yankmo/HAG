@@ -8,6 +8,7 @@ from .settings import (
     OllamaConfig,
     WeaviateConfig,
     AppConfig,
+    WeightConfig,
     config,
     get_config,
     reload_config
@@ -16,9 +17,10 @@ from .settings import (
 __all__ = [
     'ConfigManager',
     'Neo4jConfig',
-    'OllamaConfig',
+    'OllamaConfig', 
     'WeaviateConfig',
     'AppConfig',
+    'WeightConfig',
     'config',
     'get_config',
     'reload_config'
