@@ -1,6 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass, field
 from enum import Enum
 import numpy as np
 import logging
@@ -11,7 +9,8 @@ import time
 import hashlib
 import json
 import re
-from collections import defaultdict
+from dataclasses import dataclass
+from typing import Optional, List, Dict, Any
 
 # 尝试导入GNN模块
 try:

@@ -1,4 +1,4 @@
-py2neo==2021.2.3
+neo4j==5.15.0
 requests==2.31.0
 python-dotenv==1.0.0
 langchain==0.1.0
@@ -11,3 +11,24 @@ uvicorn[standard]==0.24.0
 pydantic==2.5.0
 python-multipart==0.0.6
 httpx==0.25.2
+jieba>=0.42.1
+
+# 测试框架依赖
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.10.0
+pytest-cov>=4.0.0
+pytest-xdist>=3.0.0
+pytest-timeout>=2.1.0
+factory-boy>=3.2.0
+faker>=18.0.0
+
+# 性能测试依赖
+psutil>=5.9.0
+memory-profiler>=0.60.0
+locust>=2.14.0
+
+# 测试数据库依赖
+testcontainers>=3.7.0
+redis>=4.5.0
+weaviate-client>=3.20.0

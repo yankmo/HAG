@@ -34,12 +34,17 @@ app = FastAPI(title="HAG API", description="Hybrid Augmented Generation API", ve
 
 # 配置CORS - 从环境变量获取允许的来源
 allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+# 添加通配符支持以确保开发环境正常工作
+if "*" not in allowed_origins:
+    allowed_origins.append("*")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # 请求模型
@@ -88,11 +93,12 @@ class StorageStats(BaseModel):
 
 class SearchTestRequest(BaseModel):
     query: str
-    search_type: str = "both"  # 'neo4j', 'weaviate', 'both'
+    search_type: str = "both"  # 'neo4j', 'weaviate', 'vectorized_graph', 'both', 'all'
 
 class SearchTestResponse(BaseModel):
     neo4j_results: Dict[str, Any] = {}
     weaviate_results: Dict[str, Any] = {}
+    vectorized_graph_results: Dict[str, Any] = {}
     query: str
     search_type: str
 
@@ -646,7 +652,7 @@ async def get_storage_stats():
 
 @app.post("/storage/search/test", response_model=SearchTestResponse)
 async def test_search(request: SearchTestRequest):
-    """检索测试接口"""
+    """检索测试接口 - 支持Neo4j、Weaviate和向量化图谱检索"""
     if hag_api is None:
         raise HTTPException(status_code=503, detail="HAG API not initialized")
     
@@ -655,9 +661,10 @@ async def test_search(request: SearchTestRequest):
         
         neo4j_results = {}
         weaviate_results = {}
+        vectorized_graph_results = {}
         
         # Neo4j检索
-        if request.search_type in ['neo4j', 'both']:
+        if request.search_type in ['neo4j', 'both', 'all']:
             try:
                 entities = hag_api.graph_service.search_entities_by_name(request.query, limit=5)
                 relationships = hag_api.graph_service.search_relationships_by_query(request.query, limit=8)
@@ -687,7 +694,7 @@ async def test_search(request: SearchTestRequest):
                 neo4j_results = {"error": f"Neo4j检索失败: {str(e)}"}
         
         # Weaviate检索
-        if request.search_type in ['weaviate', 'both']:
+        if request.search_type in ['weaviate', 'both', 'all']:
             try:
                 retrieval_result = hag_api.retrieval_service.search_hybrid(request.query, limit=5)
                 
@@ -706,12 +713,61 @@ async def test_search(request: SearchTestRequest):
                 logger.warning(f"Weaviate检索失败: {e}")
                 weaviate_results = {"error": f"Weaviate检索失败: {str(e)}"}
         
-        return SearchTestResponse(
-            neo4j_results=neo4j_results,
-            weaviate_results=weaviate_results,
-            query=request.query,
-            search_type=request.search_type
-        )
+        # 向量化图谱检索
+        if request.search_type in ['vectorized_graph', 'both', 'all']:
+            try:
+                # 使用向量化图谱检索服务
+                graph_result = hag_api.graph_service.search_by_query(request.query)
+                
+                vectorized_graph_results = {
+                    "nodes": [
+                        {
+                            "name": node.get('name'),
+                            "type": node.get('type'),
+                            "description": node.get('description'),
+                            "score": node.get('similarity', 0.0),
+                            "properties": node.get('properties', {})
+                        } for node in graph_result.nodes[:5]
+                    ],
+                    "relationships": [
+                        {
+                            "source": rel.get('source_node'),
+                            "target": rel.get('target_node'),
+                            "type": rel.get('relation_type'),
+                            "description": rel.get('description'),
+                            "score": rel.get('similarity', 0.0),
+                            "properties": rel.get('properties', {})
+                        } for rel in graph_result.relations[:8]
+                    ],
+                    "total_nodes": len(graph_result.nodes),
+                    "total_relationships": len(graph_result.relations),
+                    "search_metadata": {
+                        "search_time_seconds": graph_result.search_time,
+                        "total_results": graph_result.total_results,
+                        "query_vector_length": len(graph_result.query_vector) if graph_result.query_vector else 0
+                    }
+                }
+                
+                logger.info(f"向量化图谱检索完成: 找到 {len(graph_result.nodes)} 个节点, {len(graph_result.relations)} 个关系")
+                
+            except Exception as e:
+                logger.warning(f"向量化图谱检索失败: {e}")
+                vectorized_graph_results = {"error": f"向量化图谱检索失败: {str(e)}"}
+        
+        # 构建响应，根据search_type决定返回哪些结果
+        response_data = {
+            "query": request.query,
+            "search_type": request.search_type
+        }
+        
+        if neo4j_results:
+            response_data["neo4j_results"] = neo4j_results
+        if weaviate_results:
+            response_data["weaviate_results"] = weaviate_results
+        if vectorized_graph_results:
+            response_data["vectorized_graph_results"] = vectorized_graph_results
+        
+        return SearchTestResponse(**response_data)
         
     except Exception as e:
         logger.error(f"检索测试失败: {e}")

@@ -7,12 +7,10 @@ A/B测试管理器
 
 import asyncio
 import logging
-import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 import json
-import hashlib
 
 try:
     from .ab_testing import (
@@ -23,16 +21,13 @@ try:
 except ImportError:
     # 占位符类，用于处理导入失败
     class ABTestingFramework:
-        def __init__(self, *args, **kwargs):
-            pass
+        pass
     
     class ExperimentGroup:
-        def __init__(self, *args, **kwargs):
-            pass
+        pass
     
     class Metric:
-        def __init__(self, *args, **kwargs):
-            pass
+        pass
     
     class MetricType:
         RELEVANCE_SCORE = "relevance_score"
@@ -46,7 +41,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class WeightExperimentConfig:
     """权重实验配置"""
@@ -58,7 +52,6 @@ class WeightExperimentConfig:
     duration_days: int = 7
     min_sample_size: int = 100
     target_metrics: List[str] = None
-
 
 class ABTestManager:
     """A/B测试管理器"""

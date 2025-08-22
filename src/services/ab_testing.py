@@ -5,18 +5,17 @@ A/B测试框架
 用于评估不同权重策略的效果，支持实验设计、数据收集和统计分析
 """
 
-import asyncio
 import json
 import logging
 import random
 import time
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Tuple, Union
 from dataclasses import dataclass, field
 from enum import Enum
 from collections import defaultdict
 import statistics
 import uuid
+from typing import Dict, List, Any, Optional, Tuple
 
 try:
     from scipy import stats

@@ -8,9 +8,7 @@ import sys
 import os
 import requests
 import logging
-from typing import List, Optional, Dict, Any
-
-# 添加项目根目录到Python路径
+from typing import List
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, project_root)
 
@@ -96,6 +94,18 @@ class OllamaEmbeddingService:
                 embeddings.append(embedding)
                 
         return embeddings
+    
+    def get_embedding(self, text: str) -> List[float]:
+        """
+        获取文本的向量表示（embed_text的别名）
+        
+        Args:
+            text: 输入文本
+            
+        Returns:
+            List[float]: 向量表示
+        """
+        return self.embed_text(text)
     
     def get_embedding_dimension(self) -> int:
         """

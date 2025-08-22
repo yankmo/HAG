@@ -3,8 +3,8 @@ RAG管道 - 使用LangChain构建检索增强生成管道
 """
 
 import logging
-from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
+from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 

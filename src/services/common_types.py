@@ -7,9 +7,9 @@
 
 import numpy as np
 import logging
-from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
+from typing import Dict, List, Any
 
 # 配置日志
 logger = logging.getLogger(__name__)

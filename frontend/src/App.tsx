@@ -281,7 +281,7 @@ function App() {
           },
           body: JSON.stringify({
             question,
-            session_id: sessionId,
+            session_id: currentSessionId,
             include_history: true,
           }),
         },

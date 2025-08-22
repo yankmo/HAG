@@ -13,6 +13,9 @@ from py2neo import Graph, Node, Relationship
 from dataclasses import dataclass
 import logging
 
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from config import get_config
 
 # 配置日志

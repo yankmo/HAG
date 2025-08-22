@@ -8,14 +8,11 @@ Neo4j图谱检索服务模块
 import sys
 import os
 import logging
-from typing import List, Dict, Any, Optional, Tuple
-
+from typing import List, Dict, Any
 # 添加项目根目录到Python路径
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, project_root)
 
-from config import get_config
-from src.knowledge.neo4j_vector_storage import Neo4jVectorStore, Neo4jIntentRecognizer, IntentResult
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -240,6 +237,9 @@ class GraphRetrievalService:
     
     def _extract_main_keyword(self, query: str) -> str:
         """提取查询的主要关键词"""
+        import jieba
+        import re
+        
         # 医学关键词优先级
         medical_priority_keywords = ['帕金森', 'Parkinson', '帕金森氏症']
         
@@ -247,10 +247,30 @@ class GraphRetrievalService:
             if keyword in query:
                 return keyword
         
-        # 如果没有医学关键词，返回最长的词
-        words = query.replace('？', '').replace('?', '').replace('吗', '').split()
-        if words:
-            return max(words, key=len)
+        # 检查是否包含空格（区分中英文）
+        if ' ' in query:
+            # 英文查询：按空格分割
+            words = query.split()
+            # 过滤停用词
+            stop_words = {'is', 'a', 'an', 'the', 'this', 'that', 'and', 'or', 'but'}
+            filtered_words = [word.strip() for word in words if word.strip().lower() not in stop_words and len(word.strip()) > 1]
+            if filtered_words:
+                return max(filtered_words, key=len)
+        else:
+            # 中文查询：使用jieba分词
+            cleaned_query = re.sub(r'[？?！!。，,、；;：:]', '', query)
+            words = list(jieba.cut(cleaned_query, cut_all=False))
+            
+            # 过滤停用词和短词
+            stop_words = {'的', '是', '在', '有', '和', '与', '或', '但', '而', '了', '吗', '呢', '啊', '什么', '怎么', '如何', '这', '那', '一个', '一种'}
+            filtered_words = [word.strip() for word in words if len(word.strip()) >= 2 and word.strip() not in stop_words]
+            
+            # 如果分词后只有一个词或没有有效词，返回原查询
+            if len(filtered_words) <= 1:
+                return query
+            else:
+                # 返回最长的有意义词汇
+                return max(filtered_words, key=len)
         
         return query
     
@@ -258,10 +278,20 @@ class GraphRetrievalService:
         """计算关系与查询的相关性评分"""
         score = 0.0
         query_lower = query.lower()
+        target_lower = relationship['target'].lower()
         
-        # 检查目标实体名称匹配
-        if query_lower in relationship['target'].lower():
-            score += 3.0
+        # 检查目标实体名称匹配 - 修复字符串包含逻辑
+        # 检查目标实体是否包含在查询中，或查询是否包含目标实体
+        if target_lower in query_lower or query_lower in target_lower:
+            # 如果是完全匹配，给更高分数
+            if target_lower == query_lower:
+                score += 5.0
+            # 如果目标实体包含在查询中（如'左旋多巴'包含在'左旋多巴治疗'中）
+            elif target_lower in query_lower:
+                score += 4.0
+            # 如果查询包含在目标实体中
+            else:
+                score += 3.0
         
         # 检查关系类型匹配
         if any(keyword in relationship['type'].lower() for keyword in ['treat', 'therapy', 'cure', '治疗']):
@@ -374,6 +404,7 @@ class GraphRetrievalService:
     def _extract_keywords(self, query: str) -> List[str]:
         """从查询中提取关键词"""
         import re
+        import jieba
         
         # 定义医学相关关键词
         medical_keywords = [
@@ -381,14 +412,20 @@ class GraphRetrievalService:
             '康复', '运动', '疗法', '诊断', '预防', '病因', '发病', '机制'
         ]
         
-        # 移除标点符号和停用词
-        cleaned_query = re.sub(r'[？?！!。，,、；;：:]', ' ', query)
-        words = cleaned_query.split()
+        # 移除标点符号
+        cleaned_query = re.sub(r'[？?！!。，,、；;：:]', '', query)
+        
+        # 使用jieba进行中文分词
+        words = list(jieba.cut(cleaned_query, cut_all=False))
+        
+        # 定义停用词
+        stop_words = {'的', '是', '在', '有', '和', '与', '或', '但', '而', '了', '吗', '呢', '啊', '什么', '怎么', '如何', '这', '那', '一个', '一种'}
         
         # 提取关键词
         keywords = []
         for word in words:
-            if len(word) >= 2:  # 至少2个字符
+            word = word.strip()
+            if len(word) >= 2 and word not in stop_words:  # 至少2个字符且不是停用词
                 keywords.append(word)
         
         # 添加医学关键词匹配
@@ -405,7 +442,7 @@ class GraphRetrievalService:
             return self.intent_recognizer.recognize_intent(query)
         except Exception as e:
             logger.error(f"意图识别失败: {e}")
-            from src.knowledge.intent_recognition_neo4j import IntentResult
+            from src.knowledge.neo4j_vector_storage import IntentResult
             return IntentResult("unknown", 0.0, [], [], {"error": str(e)})
     
     def search_with_intent(self, query: str, limit: int = 10) -> Dict[str, Any]:

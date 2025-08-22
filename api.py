@@ -10,6 +10,20 @@ import os
 import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
+from datetime import datetime
+from fastapi import FastAPI
+
+app = FastAPI(title="HAG Integrated API", description="HAG整合API - 使用LangChain Runnable整合所有功能")
+
+# 添加CORS支持
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # 添加项目根目录到Python路径
 project_root = os.path.dirname(os.path.abspath(__file__))
@@ -23,7 +37,7 @@ from langchain_core.prompts import ChatPromptTemplate
 # 项目模块导入
 from config import get_config
 from src.services import (
-    RetrievalService, GraphRetrievalService, HybridRetrievalService,
+    RetrievalService, VectorizedGraphRetrievalService, HybridRetrievalService,
     RAGPipeline, OllamaLLMService, OllamaEmbeddingService
 )
 from src.knowledge.vector_storage import WeaviateVectorStore
@@ -91,15 +105,103 @@ class HAGIntegratedAPI:
                 vector_store=self.vector_store
             )
             
-            # 4. 初始化Neo4j图谱检索服务
-            self.graph_service = GraphRetrievalService(self.config.neo4j)
+            # 4. 初始化向量化图谱检索服务
+            from src.services.vectorized_graph_retrieval_service import GraphSearchConfig
+            from src.knowledge.vectorized_graph_retrieval import KnowledgeChainConfig
+            
+            # 创建向量化图谱存储
+            from src.knowledge.vectorized_graph_storage import VectorizedGraphStorage
+            vectorized_storage = VectorizedGraphStorage()
+            
+            # 配置搜索参数
+            search_config = GraphSearchConfig(
+                max_nodes=20,
+                max_relations=30,
+                max_chains=10,
+                min_similarity=0.7,
+                enable_chain_building=True,
+                enable_async_search=True,
+                search_timeout=30.0
+            )
+            
+            # 配置知识链路参数
+            chain_config = KnowledgeChainConfig(
+                 max_chain_length=5,
+                 min_similarity_threshold=0.7,
+                 max_nodes_per_query=20,
+                 max_relations_per_query=30,
+                 chain_weight_decay=0.8,
+                 relation_boost_factor=1.2
+             )
+            
+            self.graph_service = VectorizedGraphRetrievalService(
+                storage=vectorized_storage,
+                config=search_config,
+                chain_config=chain_config
+            )
             
             # 5. 初始化混合检索服务
             self.hybrid_service = HybridRetrievalService(
                 document_retrieval_service=self.retrieval_service,
                 graph_retrieval_service=self.graph_service,
                 doc_weight=0.6,
-                graph_weight=0.4
+                graph_weight=0.4,
+                weight_strategy="adaptive",
+                enable_dynamic_weights=True,
+                weight_manager_config={
+                    "learning_rate": 0.01,
+                    "cache_size": 1000,
+                    "enable_gnn": True,
+                    "gnn_config": {
+                        "hidden_dim": 128,
+                        "num_layers": 2,
+                        "dropout": 0.1,
+                        "learning_rate": 0.001
+                    }
+                },
+                enable_ab_testing=True,
+                ab_test_config={
+                    "strategies": ["static", "adaptive", "gnn_driven"],
+                    "traffic_split": [0.3, 0.4, 0.3],
+                    "min_samples": 100
+                },
+                cache_config={
+                    "cache_type": "hybrid",
+                    "max_size": 2000,
+                    "default_ttl": 3600,
+                    "redis_config": {
+                        "host": "localhost",
+                        "port": 6379,
+                        "db": 0,
+                        "key_prefix": "hag_cache:"
+                    },
+                    "enable_compression": False,
+                     "enable_async": True
+                 },
+                 enable_concurrent_queries=True,
+                 max_workers=4,
+                 connection_pool_config={
+                     "neo4j": {
+                         "uri": "bolt://localhost:7687",
+                         "username": "neo4j",
+                         "password": "password",
+                         "database": "neo4j",
+                         "min_connections": 2,
+                         "max_connections": 10,
+                         "max_connection_age": 3600,
+                         "max_idle_time": 300
+                     },
+                     "weaviate": {
+                         "url": "http://localhost:8080",
+                         "api_key": None,
+                         "additional_headers": {},
+                         "min_connections": 2,
+                         "max_connections": 8,
+                         "max_connection_age": 3600,
+                         "max_idle_time": 300
+                     }
+                 },
+                 enable_performance_monitoring=True
             )
             
             # 6. 初始化LLM服务
@@ -585,6 +687,99 @@ def query_knowledge(question: str) -> IntegratedResponse:
         IntegratedResponse: 整合响应结果
     """
     return get_api().query(question)
+
+# FastAPI路由
+@app.post("/query")
+def api_query(request: dict):
+    """查询接口"""
+    try:
+        question = request.get("question", "")
+        if not question:
+            return {"status": "error", "message": "问题不能为空"}
+        
+        result = query_knowledge(question)
+        
+        return {
+            "status": "success",
+            "data": {
+                "answer": result.answer,
+                "sources": result.sources,
+                "metadata": result.metadata,
+                "retrieval_process": [
+                    {
+                        "step_name": step.step_name,
+                        "step_description": step.step_description,
+                        "duration": step.duration,
+                        "status": step.status,
+                        "result_count": step.result_count,
+                        "details": step.details
+                    }
+                    for step in result.retrieval_process
+                ]
+            }
+        }
+    except Exception as e:
+        logger.error(f"API查询失败: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.get("/status")
+def api_status():
+    """系统状态接口"""
+    try:
+        status = get_api().get_system_status()
+        return {"status": "success", "data": status}
+    except Exception as e:
+        logger.error(f"获取系统状态失败: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.get("/health")
+def health_check():
+    """健康检查"""
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+@app.get("/performance/stats")
+def get_performance_stats():
+    """获取性能统计信息"""
+    try:
+        from src.services.performance_monitor import performance_monitor
+        stats = performance_monitor.get_current_stats()
+        return {"status": "success", "data": stats}
+    except Exception as e:
+        logger.error(f"获取性能统计失败: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.get("/performance/recent-queries")
+def get_recent_queries(limit: int = 100):
+    """获取最近的查询记录"""
+    try:
+        from src.services.performance_monitor import performance_monitor
+        queries = performance_monitor.get_recent_queries(limit)
+        return {"status": "success", "data": queries}
+    except Exception as e:
+        logger.error(f"获取最近查询记录失败: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.get("/performance/insights")
+def get_performance_insights():
+    """获取性能洞察和建议"""
+    try:
+        from src.services.performance_monitor import performance_monitor
+        insights = performance_monitor.get_performance_insights()
+        return {"status": "success", "data": insights}
+    except Exception as e:
+        logger.error(f"获取性能洞察失败: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.post("/performance/export")
+def export_performance_metrics(filepath: str = "performance_metrics.json"):
+    """导出性能指标到文件"""
+    try:
+        from src.services.performance_monitor import performance_monitor
+        performance_monitor.export_metrics(filepath)
+        return {"status": "success", "message": f"性能指标已导出到: {filepath}"}
+    except Exception as e:
+        logger.error(f"导出性能指标失败: {e}")
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     # 测试API
