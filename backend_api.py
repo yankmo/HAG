@@ -12,18 +12,17 @@ from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import uvicorn
 import logging
-import json
 import asyncio
+from datetime import datetime
 import os
 import uuid
-from datetime import datetime
 from collections import defaultdict
 import tempfile
-import shutil
 from pathlib import Path
+import json
 
 # 导入现有的HAG API
-from api import HAGIntegratedAPI, IntegratedResponse
+from api import HAGIntegratedAPI
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -102,6 +101,35 @@ class SearchTestResponse(BaseModel):
     query: str
     search_type: str
 
+class ProcessingTask(BaseModel):
+    task_id: str
+    filename: str
+    status: str
+    progress: float
+    start_time: str
+    end_time: Optional[str] = None
+    error_message: Optional[str] = None
+    result: Optional[Dict[str, Any]] = None
+
+class CacheStats(BaseModel):
+    cache_type: str
+    total_requests: int
+    cache_hits: int
+    cache_misses: int
+    hit_rate: float
+    redis_connected: bool
+    redis_info: Dict[str, Any]
+    local_cache_size: int
+    remote_cache_size: int
+    last_updated: str
+
+class CacheHealthResponse(BaseModel):
+    redis_connected: bool
+    redis_ping_time_ms: float
+    redis_info: Dict[str, Any]
+    cache_manager_status: str
+    last_check: str
+
 # 全局HAG API实例
 hag_api: Optional[HAGIntegratedAPI] = None
 
@@ -168,6 +196,14 @@ class DocumentProcessor:
     def __init__(self):
         self.tasks = {}  # task_id -> ProcessingProgress
         self.supported_formats = {'.txt', '.pdf', '.docx', '.doc'}
+        # 初始化向量化数据导入器
+        try:
+            from src.knowledge.vectorized_data_importer import VectorizedDataImporter
+            self.vectorized_importer = VectorizedDataImporter()
+            logger.info("VectorizedDataImporter初始化成功")
+        except Exception as e:
+            logger.error(f"VectorizedDataImporter初始化失败: {e}")
+            self.vectorized_importer = None
     
     def create_task(self, filename: str, file_size: int) -> str:
         """创建新的处理任务"""
@@ -202,38 +238,162 @@ class DocumentProcessor:
     
     async def process_document(self, task_id: str, file_path: str, filename: str):
         """处理文档的后台任务"""
+        import time
+        import os
+        start_time = time.time()
+        
         try:
-            # 模拟文档处理过程
-            await asyncio.sleep(1)
-            self.update_progress(task_id, 'parsing', 20, '文档解析中', '正在解析文档内容...')
+            # 1. 预检查阶段
+            self.update_progress(task_id, 'validating', 5, '验证文档', '正在验证文档格式和大小...')
             
-            await asyncio.sleep(2)
-            self.update_progress(task_id, 'extracting', 40, '实体关系提取中', '正在提取实体和关系...')
+            # 检查文件是否存在
+            if not os.path.exists(file_path):
+                raise Exception(f"文件不存在: {file_path}")
             
-            await asyncio.sleep(2)
-            self.update_progress(task_id, 'storing_neo4j', 60, 'Neo4j存储中', '正在存储到知识图谱...')
+            # 检查文件大小（限制为10MB）
+            file_size = os.path.getsize(file_path)
+            max_size = 10 * 1024 * 1024  # 10MB
+            if file_size > max_size:
+                raise Exception(f"文件过大: {file_size / 1024 / 1024:.2f}MB，最大支持10MB")
             
-            await asyncio.sleep(2)
-            self.update_progress(task_id, 'storing_weaviate', 80, 'Weaviate向量化中', '正在生成向量表示...')
+            # 检查文件扩展名
+            allowed_extensions = {'.txt', '.pdf', '.docx', '.doc'}
+            file_ext = os.path.splitext(filename)[1].lower()
+            if file_ext not in allowed_extensions:
+                raise Exception(f"不支持的文件格式: {file_ext}，支持的格式: {', '.join(allowed_extensions)}")
             
-            await asyncio.sleep(1)
+            # 检查向量化导入器是否可用
+            if not self.vectorized_importer:
+                raise Exception("VectorizedDataImporter未初始化，请检查系统配置")
+            
+            # 2. 文档解析阶段
+            self.update_progress(task_id, 'parsing', 10, '文档解析中', '正在读取文档内容...')
+            
+            # 读取文档内容（仅支持文本文件）
+            if file_ext == '.txt':
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    logger.info(f"成功读取文档 [{filename}]: {len(content)} 字符")
+                except UnicodeDecodeError:
+                    try:
+                        # 尝试其他编码
+                        with open(file_path, 'r', encoding='gbk') as f:
+                            content = f.read()
+                        logger.info(f"使用GBK编码读取文档 [{filename}]: {len(content)} 字符")
+                    except UnicodeDecodeError:
+                        # 最后尝试latin-1编码
+                        with open(file_path, 'r', encoding='latin-1') as f:
+                            content = f.read()
+                        logger.info(f"使用Latin-1编码读取文档 [{filename}]: {len(content)} 字符")
+            else:
+                # 对于非文本文件，暂时抛出异常
+                raise Exception(f"暂不支持 {file_ext} 格式的文档解析，请转换为TXT格式")
+            
+            # 验证内容
+            if not content or not content.strip():
+                raise Exception("文档内容为空或仅包含空白字符")
+            
+            # 检查内容长度
+            if len(content) < 10:
+                raise Exception("文档内容过短，至少需要10个字符")
+            
+            if len(content) > 1000000:  # 1MB文本
+                logger.warning(f"文档内容较大: {len(content)} 字符，处理可能需要较长时间")
+            
+            self.update_progress(task_id, 'parsing', 20, '文档解析完成', f'文档大小: {len(content)} 字符')
+            
+            # 3. 实体关系提取阶段
+            self.update_progress(task_id, 'extracting', 30, '实体关系提取中', '正在使用AI模型提取实体和关系...')
+             
+            # 使用VectorizedDataImporter处理文档
+            # 注意：process_and_vectorize_file是同步方法，需要在线程池中运行
+            import asyncio
+            import concurrent.futures
+             
+            try:
+                # 在线程池中运行同步的文档处理，设置超时时间
+                loop = asyncio.get_event_loop()
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    # 设置超时时间为5分钟
+                    stats = await asyncio.wait_for(
+                        loop.run_in_executor(
+                            executor, 
+                            self.vectorized_importer.process_and_vectorize_file, 
+                            file_path
+                        ),
+                        timeout=300  # 5分钟超时
+                    )
+                 
+                # 验证处理结果
+                if not stats:
+                    raise Exception("文档处理返回空结果")
+                 
+                logger.info(f"文档处理统计 [{task_id}]: 实体={stats.total_entities}, 关系={stats.total_relations}, 向量化节点={stats.vectorized_nodes}")
+                 
+            except asyncio.TimeoutError:
+                raise Exception("文档处理超时（5分钟），请尝试处理较小的文档")
+            except AttributeError as e:
+                raise Exception(f"VectorizedDataImporter接口错误: {str(e)}")
+            except Exception as e:
+                if "Neo4j" in str(e):
+                    raise Exception(f"Neo4j数据库连接或操作失败: {str(e)}")
+                elif "Weaviate" in str(e):
+                    raise Exception(f"Weaviate向量数据库操作失败: {str(e)}")
+                elif "Ollama" in str(e):
+                    raise Exception(f"AI模型服务不可用: {str(e)}")
+                else:
+                    raise Exception(f"文档处理过程中发生错误: {str(e)}")
+             
+            # 4. 更新进度 - Neo4j存储
+            self.update_progress(task_id, 'storing_neo4j', 60, 'Neo4j存储完成', 
+                               f'已存储 {stats.total_entities} 个实体和 {stats.total_relations} 个关系')
+            
+            # 5. 更新进度 - Weaviate向量化
+            self.update_progress(task_id, 'storing_weaviate', 80, 'Weaviate向量化完成', 
+                               f'已向量化 {stats.vectorized_nodes} 个节点和 {stats.vectorized_relations} 个关系')
+            
+            # 6. 处理完成
+            processing_time = time.time() - start_time
             self.update_progress(
                 task_id, 'completed', 100, '处理完成', '文档处理完成',
                 {
-                    'neo4j_entities': 15,
-                    'neo4j_relationships': 8,
-                    'weaviate_vectors': 25,
-                    'processing_time': '8.2秒'
+                    'filename': filename,
+                    'neo4j_entities': stats.total_entities,
+                    'neo4j_relationships': stats.total_relations,
+                    'weaviate_nodes': stats.vectorized_nodes,
+                    'weaviate_relations': stats.vectorized_relations,
+                    'failed_nodes': stats.failed_nodes,
+                    'failed_relations': stats.failed_relations,
+                    'processing_time': f'{processing_time:.2f}秒',
+                    'content_length': len(content)
                 }
             )
             
-            # 清理临时文件
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                
+            logger.info(f"文档处理完成 [{task_id}]: {filename}, 耗时 {processing_time:.2f}秒")
+            
         except Exception as e:
-            logger.error(f"文档处理失败 [{task_id}]: {e}")
-            self.update_progress(task_id, 'failed', 0, '处理失败', f'处理失败: {str(e)}')
+            processing_time = time.time() - start_time
+            error_msg = str(e)
+            logger.error(f"文档处理失败 [{task_id}]: {error_msg}")
+            self.update_progress(
+                task_id, 'failed', 0, '处理失败', 
+                f'处理失败: {error_msg}',
+                {
+                    'filename': filename,
+                    'error': error_msg,
+                    'processing_time': f'{processing_time:.2f}秒'
+                }
+            )
+        
+        finally:
+            # 清理临时文件
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    logger.info(f"已清理临时文件: {file_path}")
+            except Exception as e:
+                logger.warning(f"清理临时文件失败: {e}")
 
 # 全局文档处理器
 doc_processor = DocumentProcessor()
@@ -424,8 +584,11 @@ async def query_knowledge_stream(request: QueryRequest):
                             chunk = json.loads(line.decode('utf-8'))
                             # /api/chat接口返回的是message.content而不是response
                             if 'message' in chunk and 'content' in chunk['message']:
-                                current_text += chunk['message']['content']
-                                yield f"data: {json.dumps({'type': 'content', 'content': current_text}, ensure_ascii=False)}\n\n"
+                                # 只发送新增的内容片段，而不是累积的全部内容
+                                new_content = chunk['message']['content']
+                                current_text += new_content
+                                # 只发送增量内容，并立即刷新缓冲区
+                                yield f"data: {json.dumps({'type': 'content', 'content': new_content}, ensure_ascii=False)}\n\n"
                                 
                             if chunk.get('done', False):
                                 break
@@ -436,10 +599,6 @@ async def query_knowledge_stream(request: QueryRequest):
                             logger.error(f"处理流式响应块失败: {e}")
                             continue
                 
-                # 保存用户问题和AI回答到会话历史
-                session_manager.add_message(session_id, 'user', request.question)
-                session_manager.add_message(session_id, 'assistant', current_text)
-                
             else:
                 # 如果流式请求失败，回退到普通模式
                 logger.warning("流式请求失败，回退到普通模式")
@@ -447,10 +606,10 @@ async def query_knowledge_stream(request: QueryRequest):
                 current_text = result.answer
                 yield f"data: {json.dumps({'type': 'content', 'content': current_text}, ensure_ascii=False)}\n\n"
                 retrieval_result = {'sources': result.sources}
-                
-                # 保存用户问题和AI回答到会话历史
-                session_manager.add_message(session_id, 'user', request.question)
-                session_manager.add_message(session_id, 'assistant', current_text)
+            
+            # 保存用户问题和AI回答到会话历史（统一在这里处理）
+            session_manager.add_message(session_id, 'user', request.question)
+            session_manager.add_message(session_id, 'assistant', current_text)
             
             # 检查是否有检索到的内容，只有在有内容时才发送来源信息
             has_documents = hasattr(retrieval_result, 'hybrid_results') and retrieval_result.hybrid_results
@@ -789,6 +948,145 @@ async def list_processing_tasks():
         "tasks": list(doc_processor.tasks.values()),
         "total_tasks": len(doc_processor.tasks)
     }
+
+@app.get("/cache/stats", response_model=CacheStats)
+async def get_cache_stats():
+    """获取缓存统计信息"""
+    if hag_api is None:
+        raise HTTPException(status_code=503, detail="HAG API not initialized")
+    
+    try:
+        # 获取缓存管理器统计信息 - 从hybrid_service获取
+        cache_manager = hag_api.hybrid_service.cache_manager
+        cache_stats = cache_manager.get_stats()
+        
+        # 处理不同缓存类型的统计数据
+        cache_type_info = cache_stats.get('cache_type', {})
+        cache_type = cache_type_info.get('cache_type', 'unknown') if isinstance(cache_type_info, dict) else str(cache_type_info)
+        
+        if cache_type == 'hybrid':
+            # 混合模式：合并本地和远程缓存统计
+            local_stats = cache_stats.get('local_cache', {})
+            remote_stats = cache_stats.get('remote_cache', {})
+            
+            total_requests = local_stats.get('total_requests', 0) + remote_stats.get('total_requests', 0)
+            cache_hits = local_stats.get('cache_hits', 0) + remote_stats.get('cache_hits', 0)
+            cache_misses = local_stats.get('cache_misses', 0) + remote_stats.get('cache_misses', 0)
+            hit_rate = cache_stats.get('total_hit_rate', 0.0)
+            local_cache_size = local_stats.get('total_size_bytes', 0)
+            remote_cache_size = remote_stats.get('total_size_bytes', 0)
+        else:
+            # 单一缓存模式
+            total_requests = cache_stats.get('total_requests', 0)
+            cache_hits = cache_stats.get('cache_hits', 0)
+            cache_misses = cache_stats.get('cache_misses', 0)
+            hit_rate = (cache_hits / total_requests) if total_requests > 0 else 0.0
+            local_cache_size = cache_stats.get('total_size_bytes', 0)
+            remote_cache_size = 0
+        
+        # 检查Redis连接状态
+        redis_connected = False
+        redis_info = {}
+        
+        if cache_manager.cache_type in ['redis', 'hybrid']:
+            try:
+                if hasattr(cache_manager, 'remote_cache') and cache_manager.remote_cache:
+                    redis_client = cache_manager.remote_cache.redis_client
+                    redis_connected = redis_client.ping()
+                    if redis_connected:
+                        redis_info = redis_client.info()
+                elif hasattr(cache_manager, 'cache') and hasattr(cache_manager.cache, 'redis_client'):
+                    redis_client = cache_manager.cache.redis_client
+                    redis_connected = redis_client.ping()
+                    if redis_connected:
+                        redis_info = redis_client.info()
+            except Exception as e:
+                logger.warning(f"Redis连接检查失败: {e}")
+                redis_connected = False
+        
+        return CacheStats(
+            cache_type=cache_type,
+            total_requests=total_requests,
+            cache_hits=cache_hits,
+            cache_misses=cache_misses,
+            hit_rate=round(hit_rate, 4),
+            redis_connected=redis_connected,
+            redis_info={
+                'used_memory_human': redis_info.get('used_memory_human', 'N/A'),
+                'connected_clients': redis_info.get('connected_clients', 0),
+                'total_commands_processed': redis_info.get('total_commands_processed', 0),
+                'keyspace_hits': redis_info.get('keyspace_hits', 0),
+                'keyspace_misses': redis_info.get('keyspace_misses', 0)
+            } if redis_info else {},
+            local_cache_size=local_cache_size,
+            remote_cache_size=remote_cache_size,
+            last_updated=datetime.now().isoformat()
+        )
+        
+    except Exception as e:
+        logger.error(f"获取缓存统计失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取缓存统计失败: {str(e)}")
+
+@app.get("/cache/health", response_model=CacheHealthResponse)
+async def get_cache_health():
+    """检查缓存健康状态"""
+    if hag_api is None:
+        raise HTTPException(status_code=503, detail="HAG API not initialized")
+    
+    try:
+        cache_manager = hag_api.hybrid_service.cache_manager
+        
+        # 检查Redis连接和响应时间
+        redis_connected = False
+        ping_time_ms = 0.0
+        redis_info = {}
+        cache_status = "unknown"
+        
+        if cache_manager.cache_type in ['redis', 'hybrid']:
+            try:
+                import time
+                start_time = time.time()
+                
+                if hasattr(cache_manager, 'remote_cache') and cache_manager.remote_cache:
+                    redis_client = cache_manager.remote_cache.redis_client
+                    redis_connected = redis_client.ping()
+                elif hasattr(cache_manager, 'cache') and hasattr(cache_manager.cache, 'redis_client'):
+                    redis_client = cache_manager.cache.redis_client
+                    redis_connected = redis_client.ping()
+                
+                ping_time_ms = (time.time() - start_time) * 1000
+                
+                if redis_connected:
+                    redis_info = redis_client.info()
+                    cache_status = "healthy"
+                else:
+                    cache_status = "redis_disconnected"
+                    
+            except Exception as e:
+                logger.warning(f"Redis健康检查失败: {e}")
+                redis_connected = False
+                cache_status = "redis_error"
+        else:
+            # LRU缓存模式
+            cache_status = "lru_only"
+            redis_connected = False
+        
+        return CacheHealthResponse(
+            redis_connected=redis_connected,
+            redis_ping_time_ms=round(ping_time_ms, 2),
+            redis_info={
+                'version': redis_info.get('redis_version', 'N/A'),
+                'uptime_in_seconds': redis_info.get('uptime_in_seconds', 0),
+                'used_memory_human': redis_info.get('used_memory_human', 'N/A'),
+                'connected_clients': redis_info.get('connected_clients', 0)
+            } if redis_info else {},
+            cache_manager_status=cache_status,
+            last_check=datetime.now().isoformat()
+        )
+        
+    except Exception as e:
+        logger.error(f"缓存健康检查失败: {e}")
+        raise HTTPException(status_code=500, detail=f"缓存健康检查失败: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(

@@ -37,11 +37,11 @@ except ImportError:
 
 # A/B测试管理器导入
 try:
-    from .ab_test_manager import ABTestManager
+    from .ab_testing import ABTestingFramework
 except ImportError:
     # 如果导入失败，创建占位符类
-    class ABTestManager:
-        def assign_strategy(self, *args, **kwargs):
+    class ABTestingFramework:
+        def assign_user(self, *args, **kwargs):
             return None
         
         logger = logging.getLogger(__name__)
@@ -168,10 +168,10 @@ class HybridRetrievalService:
         if enable_ab_testing:
             try:
                 config = ab_test_config or {}
-                self.ab_test_manager = ABTestManager(
+                self.ab_test_manager = ABTestingFramework(
                     storage_path=config.get('storage_path', './ab_test_data'),
                     significance_level=config.get('significance_level', 0.05),
-                    auto_cleanup=config.get('auto_cleanup', True)
+                    min_effect_size=config.get('min_effect_size', 0.1)
                 )
                 logger.info("A/B测试管理器已初始化")
             except Exception as e:
@@ -260,7 +260,7 @@ class HybridRetrievalService:
             original_strategy = self.weight_strategy
             if self.enable_ab_testing and self.ab_test_manager and user_id:
                 try:
-                    assignment = self.ab_test_manager.assign_strategy(user_id, query)
+                    assignment = self.ab_test_manager.assign_user(experiment_id='weight_strategy_test', user_id=user_id)
                     if assignment:
                         assigned_strategy = assignment.get('strategy')
                         experiment_id = assignment.get('experiment_id')
@@ -350,11 +350,12 @@ class HybridRetrievalService:
                     self.ab_test_manager.record_result(
                         experiment_id=experiment_id,
                         user_id=user_id,
-                        query=query,
-                        result_score=combined_score,
-                        result_count=len(result.documents) + len(result.entities),
-                        response_time=time.time() - start_time,
+                        metric_name='combined_score',
+                        value=combined_score,
                         metadata={
+                            'query': query,
+                            'result_count': len(result.documents) + len(result.entities),
+                            'response_time': time.time() - start_time,
                             'doc_weight': self.current_doc_weight,
                             'graph_weight': self.current_graph_weight,
                             'strategy': assigned_strategy or self.weight_strategy
@@ -932,9 +933,8 @@ class HybridRetrievalService:
             
             experiment_id = self.ab_test_manager.create_experiment(
                 name=name,
-                strategies=strategies,
-                traffic_split=traffic_split,
-                description=description
+                description=description,
+                groups=[{'name': strategy, 'traffic_percentage': traffic_split.get(strategy, 1.0/len(strategies)) if traffic_split else 1.0/len(strategies)} for strategy in strategies]
             )
             
             if experiment_id:
@@ -988,7 +988,7 @@ class HybridRetrievalService:
             if not self.enable_ab_testing or not self.ab_test_manager:
                 return {}
             
-            return self.ab_test_manager.get_experiment_stats(experiment_id)
+            return self.ab_test_manager.get_statistics(experiment_id)
             
         except Exception as e:
             logger.error(f"获取A/B测试实验统计失败: {e}")

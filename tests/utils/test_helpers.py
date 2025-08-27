@@ -14,13 +14,12 @@ import random
 import string
 import tempfile
 import time
-import threading
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional, Callable, Union, Generator
-from unittest.mock import Mock, patch, MagicMock
+from typing import Any, Dict, List, Optional, Callable, Generator
+from unittest.mock import Mock
 import pytest
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 @dataclass

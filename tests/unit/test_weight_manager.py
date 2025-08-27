@@ -6,11 +6,8 @@
 """
 
 import pytest
-import asyncio
-import time
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 from datetime import datetime
-from typing import Dict, List, Any
 
 # 导入被测试的模块
 from src.services.weight_manager import (
@@ -18,7 +15,6 @@ from src.services.weight_manager import (
     QueryContext,
     SearchResult,
     WeightResult,
-    WeightCalculator,
     StaticWeightCalculator,
     IntentDrivenWeightCalculator,
     QualityDrivenWeightCalculator,

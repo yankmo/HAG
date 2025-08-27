@@ -12,7 +12,7 @@ import threading
 from threading import Lock
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from typing import Any, Optional, Dict, Set
 
 try:

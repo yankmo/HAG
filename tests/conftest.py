@@ -10,8 +10,7 @@ import os
 import sys
 import tempfile
 import shutil
-from typing import Dict, Any, Generator
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 import logging
 
 # 添加项目根目录到Python路径

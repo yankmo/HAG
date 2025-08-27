@@ -7,13 +7,11 @@ GNN训练数据生成器
 
 import logging
 import numpy as np
-import pandas as pd
-from typing import List, Dict, Any, Tuple, Optional, Set
+from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import json
 import random
-from collections import defaultdict, Counter
 
 # Neo4j连接
 try:

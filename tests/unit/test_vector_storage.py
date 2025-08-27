@@ -6,11 +6,7 @@ Weaviate向量存储服务单元测试
 """
 
 import pytest
-import unittest.mock as mock
-from unittest.mock import Mock, MagicMock, patch, AsyncMock
-from typing import List, Dict, Any
-import logging
-from datetime import datetime
+from unittest.mock import Mock, patch
 
 # 导入被测试的模块
 from src.knowledge.vector_storage import (

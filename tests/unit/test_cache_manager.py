@@ -1,10 +1,6 @@
 import pytest
-import asyncio
 import time
-import threading
-from unittest.mock import Mock, patch, MagicMock
-from dataclasses import asdict
-from typing import Dict, Any, Optional
+from unittest.mock import Mock, patch
 
 from src.services.cache_manager import (
     CacheEntry,

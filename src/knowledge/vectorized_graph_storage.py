@@ -6,10 +6,9 @@
 """
 
 import logging
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any
 from dataclasses import dataclass
 from datetime import datetime
-import numpy as np
 import os
 
 logger = logging.getLogger(__name__)

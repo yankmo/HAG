@@ -1,10 +1,9 @@
 """HybridRetrievalService 单元测试"""
 
 import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+from unittest.mock import Mock, AsyncMock, patch
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 # 导入被测试的类
 from src.services.hybrid_retrieval_service import HybridRetrievalService, HybridResult
@@ -146,7 +145,7 @@ class TestHybridRetrievalService:
     
     def test_init_with_ab_testing(self, mock_doc_service, mock_graph_service):
         """测试A/B测试初始化"""
-        with patch('src.services.hybrid_retrieval_service.ABTestManager') as mock_ab_manager:
+        with patch('src.services.hybrid_retrieval_service.ABTestingFramework') as mock_ab_manager:
             mock_manager_instance = Mock()
             mock_ab_manager.return_value = mock_manager_instance
             
@@ -254,10 +253,10 @@ class TestHybridRetrievalService:
     @pytest.mark.asyncio
     async def test_search_hybrid_with_ab_testing(self, mock_doc_service, mock_graph_service, mock_hybrid_result):
         """测试A/B测试混合检索"""
-        with patch('src.services.hybrid_retrieval_service.ABTestManager') as mock_ab_manager:
+        with patch('src.services.hybrid_retrieval_service.ABTestingFramework') as mock_ab_manager:
             mock_manager_instance = Mock()
-            mock_manager_instance.assign_strategy = Mock(return_value={
-                'strategy': WeightStrategy.QUALITY_DRIVEN,
+            mock_manager_instance.assign_user = Mock(return_value={
+                'group': 'treatment',
                 'experiment_id': 'exp_123'
             })
             mock_manager_instance.record_result = Mock()
@@ -285,7 +284,7 @@ class TestHybridRetrievalService:
             assert result.metadata['ab_test_enabled'] is True
             assert result.metadata['assigned_strategy'] == WeightStrategy.QUALITY_DRIVEN
             assert result.metadata['experiment_id'] == 'exp_123'
-            mock_manager_instance.assign_strategy.assert_called_once_with("user123", "测试查询")
+            mock_manager_instance.assign_user.assert_called_once_with(experiment_id='weight_strategy_test', user_id="user123")
             mock_manager_instance.record_result.assert_called_once()
     
     @pytest.mark.asyncio

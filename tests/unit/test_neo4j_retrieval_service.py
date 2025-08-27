@@ -6,9 +6,7 @@ Neo4jRetrievalService单元测试
 """
 
 import pytest
-import asyncio
-from unittest.mock import Mock, patch, MagicMock, AsyncMock
-from typing import List, Dict, Any
+from unittest.mock import Mock, patch
 
 # 导入被测试的类
 from src.services.neo4j_retrieval_service import GraphRetrievalService

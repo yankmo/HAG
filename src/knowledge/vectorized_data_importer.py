@@ -6,9 +6,8 @@
 """
 
 import logging
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any
 from dataclasses import dataclass
-import json
 from py2neo import Graph
 
 from src.knowledge.intent_recognition_neo4j import KnowledgeGraphBuilder, Entity, Relation

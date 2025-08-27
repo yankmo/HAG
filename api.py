@@ -8,7 +8,7 @@ HAG 整合API - 使用LangChain Runnable整合所有功能
 import sys
 import os
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from dataclasses import dataclass
 from datetime import datetime
 from fastapi import FastAPI
@@ -30,7 +30,7 @@ project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, project_root)
 
 # LangChain imports
-from langchain_core.runnables import Runnable, RunnableLambda, RunnablePassthrough
+from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -41,7 +41,6 @@ from src.services import (
     RAGPipeline, OllamaLLMService, OllamaEmbeddingService
 )
 from src.knowledge.vector_storage import WeaviateVectorStore
-from src.knowledge.neo4j_vector_storage import Neo4jVectorStore
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

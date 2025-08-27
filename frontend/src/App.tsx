@@ -313,11 +313,11 @@ function App() {
                     setSessionId(data.session_id);
                   }
                 } else if (data.type === "content") {
-                  // 更新消息内容
+                  // 累积增量内容
                   setMessages((prev: Message[]) =>
                     prev.map((msg: Message) =>
                       msg.id === botMessageId
-                        ? { ...msg, text: data.content, isStreaming: false }
+                        ? { ...msg, text: (msg.text || '') + data.content, isStreaming: true }
                         : msg,
                     ),
                   );

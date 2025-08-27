@@ -17,7 +17,7 @@ from config import get_config
 from src.services.embedding_service import OllamaEmbeddingService
 from src.knowledge.vector_storage import WeaviateVectorStore
 from src.services.common_types import (
-    DistanceMetric, SearchResult, HybridSearchResult, SimilarityCalculator
+    SearchResult, HybridSearchResult, SimilarityCalculator
 )
 
 # 配置日志

@@ -8,7 +8,6 @@
 import pytest
 import asyncio
 import time
-from concurrent.futures import ThreadPoolExecutor
 from tests.utils import (
     PerformanceMonitor,
     ConcurrencyTestHelper,

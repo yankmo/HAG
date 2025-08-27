@@ -8,7 +8,6 @@ from concurrent.futures import ThreadPoolExecutor
 import time
 import hashlib
 import json
-import re
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 

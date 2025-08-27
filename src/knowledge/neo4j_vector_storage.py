@@ -7,13 +7,12 @@ Neo4j向量存储模块
 
 import sys
 import os
-import json
 import numpy as np
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any
 from dataclasses import dataclass
 import logging
 from datetime import datetime
-from py2neo import Graph, Node, Relationship
+from py2neo import Graph, Node
 from py2neo.matching import NodeMatcher, RelationshipMatcher
 
 # 添加项目根目录到Python路径
