@@ -13,6 +13,9 @@ from typing import List, Dict, Any
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, project_root)
 
+# 导入Neo4jIntentRecognizer
+from src.knowledge.neo4j_vector_storage import Neo4jIntentRecognizer
+
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
