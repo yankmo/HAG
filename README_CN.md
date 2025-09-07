@@ -2,6 +2,9 @@
 
 <div align="center">
 
+<img src="frontend/public/hag-logo-large.svg" alt="HAG Logo" width="350" />
+
+
 [![GitHub stars](https://img.shields.io/github/stars/yankmo/HAG?style=social)](https://github.com/yankmo/HAG)
 [![GitHub forks](https://img.shields.io/github/forks/yankmo/HAG?style=social)](https://github.com/yankmo/HAG)
 [![GitHub issues](https://img.shields.io/github/issues/yankmo/HAG)](https://github.com/yankmo/HAG/issues)

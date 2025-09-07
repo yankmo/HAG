@@ -312,17 +312,28 @@ class DocumentProcessor:
             import concurrent.futures
              
             try:
-                # 在线程池中运行同步的文档处理，设置超时时间
+                # 创建进度回调函数
+                def progress_callback(stage: str, progress: int, message: str, details: str = ''):
+                    """进度回调函数"""
+                    if stage == 'text_splitting':
+                        actual_progress = 30 + (progress * 0.1)  # 30-40%
+                    elif stage == 'entity_extraction':
+                        actual_progress = 40 + (progress * 0.15)  # 40-55%
+                    elif stage == 'relation_extraction':
+                        actual_progress = 55 + (progress * 0.05)  # 55-60%
+                    else:
+                        actual_progress = 30 + (progress * 0.3)  # 默认30-60%
+                    
+                    self.update_progress(task_id, 'extracting', int(actual_progress), message, details)
+                
+                # 在线程池中运行同步的文档处理，移除超时限制
                 loop = asyncio.get_event_loop()
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    # 设置超时时间为5分钟
-                    stats = await asyncio.wait_for(
-                        loop.run_in_executor(
-                            executor, 
-                            self.vectorized_importer.process_and_vectorize_file, 
-                            file_path
-                        ),
-                        timeout=300  # 5分钟超时
+                    # 移除超时限制，让大文档有足够时间处理
+                    stats = await loop.run_in_executor(
+                        executor, 
+                        self.vectorized_importer.process_and_vectorize_file_with_progress, 
+                        file_path, 500, progress_callback
                     )
                  
                 # 验证处理结果
@@ -331,10 +342,20 @@ class DocumentProcessor:
                  
                 logger.info(f"文档处理统计 [{task_id}]: 实体={stats.total_entities}, 关系={stats.total_relations}, 向量化节点={stats.vectorized_nodes}")
                  
-            except asyncio.TimeoutError:
-                raise Exception("文档处理超时（5分钟），请尝试处理较小的文档")
             except AttributeError as e:
-                raise Exception(f"VectorizedDataImporter接口错误: {str(e)}")
+                # 如果新方法不存在，回退到原方法但移除超时
+                logger.warning(f"使用回退方法处理文档: {str(e)}")
+                loop = asyncio.get_event_loop()
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    stats = await loop.run_in_executor(
+                        executor, 
+                        self.vectorized_importer.process_and_vectorize_file, 
+                        file_path
+                    )
+                
+                if not stats:
+                    raise Exception("文档处理返回空结果")
+                    
             except Exception as e:
                 if "Neo4j" in str(e):
                     raise Exception(f"Neo4j数据库连接或操作失败: {str(e)}")
