@@ -59,8 +59,27 @@ const StorageManager: React.FC<StorageManagerProps> = ({ isOpen, onClose }) => {
         
         const progress = await response.json();
         
-        setProcessingStage(progress.current_stage);
-        setUploadProgress(progress.progress);
+        // 更新进度显示
+        setProcessingStage(progress.current_stage || '处理中...');
+        setUploadProgress(progress.progress || 0);
+        
+        // 如果有详细信息，显示更具体的进度
+        if (progress.details) {
+          const details = progress.details;
+          let stageDetail = '';
+          
+          if (details.current_operation) {
+            stageDetail = details.current_operation;
+          }
+          
+          if (details.sub_progress) {
+            stageDetail += ` (${details.sub_progress})`;
+          }
+          
+          if (stageDetail) {
+            setProcessingStage(`${progress.current_stage}: ${stageDetail}`);
+          }
+        }
         
         if (progress.status === 'completed') {
           clearInterval(pollInterval);
@@ -297,20 +316,47 @@ const StorageManager: React.FC<StorageManagerProps> = ({ isOpen, onClose }) => {
              )}
           </div>
 
-          {/* 处理进度 */}
+          {/* 进度条 */}
           {isProcessing && (
             <div className="progress-section">
-              <h3>处理进度</h3>
               <div className="progress-info">
-                <div className="progress-stage">{processingStage}</div>
+                <span className="progress-stage">{processingStage}</span>
+                <div className="progress-details">
+                  {uploadProgress < 30 && (
+                    <small>正在解析文档结构...</small>
+                  )}
+                  {uploadProgress >= 30 && uploadProgress < 60 && (
+                    <small>正在提取实体和关系...</small>
+                  )}
+                  {uploadProgress >= 60 && uploadProgress < 80 && (
+                    <small>正在存储到Neo4j数据库...</small>
+                  )}
+                  {uploadProgress >= 80 && uploadProgress < 100 && (
+                    <small>正在生成向量并存储到Weaviate...</small>
+                  )}
+                  {uploadProgress >= 100 && (
+                    <small>处理完成！</small>
+                  )}
+                </div>
               </div>
               <div className="progress-bar">
                 <div 
                   className="progress-fill" 
-                  style={{ width: `${uploadProgress}%` }}
+                  style={{ 
+                    width: `${uploadProgress}%`,
+                    background: uploadProgress < 30 ? '#3b82f6' : 
+                               uploadProgress < 60 ? '#f59e0b' : 
+                               uploadProgress < 80 ? '#10b981' : 
+                               uploadProgress < 100 ? '#8b5cf6' : '#22c55e'
+                  }}
                 ></div>
               </div>
               <div className="progress-percent">{uploadProgress}%</div>
+              {uploadProgress >= 30 && uploadProgress < 60 && (
+                <div className="progress-warning">
+                  <small>⚠️ 大文档处理可能需要较长时间，请耐心等待</small>
+                </div>
+              )}
             </div>
           )}
 

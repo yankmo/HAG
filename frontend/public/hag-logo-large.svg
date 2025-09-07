@@ -1,0 +1,70 @@
+<svg width="300" height="90" viewBox="0 0 300 90" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4F46E5;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#7C3AED;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#EC4899;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#10B981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3B82F6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 背景圆形 -->
+  <circle cx="45" cy="45" r="37" fill="url(#gradient1)" opacity="0.1"/>
+  
+  <!-- 图谱节点网络 -->
+  <g stroke="url(#gradient1)" stroke-width="3" fill="none">
+    <!-- 连接线 -->
+    <line x1="22" y1="30" x2="37" y2="45" opacity="0.6"/>
+    <line x1="37" y1="45" x2="52" y2="37" opacity="0.6"/>
+    <line x1="52" y1="37" x2="67" y2="52" opacity="0.6"/>
+    <line x1="37" y1="45" x2="45" y2="60" opacity="0.6"/>
+    <line x1="52" y1="37" x2="60" y2="22" opacity="0.6"/>
+    <line x1="22" y1="30" x2="30" y2="15" opacity="0.6"/>
+    <line x1="67" y1="52" x2="75" y2="40" opacity="0.6"/>
+  </g>
+  
+  <!-- 图谱节点 -->
+  <g fill="url(#gradient1)">
+    <circle cx="22" cy="30" r="4.5"/>
+    <circle cx="37" cy="45" r="6"/>
+    <circle cx="52" cy="37" r="4.5"/>
+    <circle cx="67" cy="52" r="4.5"/>
+    <circle cx="45" cy="60" r="3.5"/>
+    <circle cx="60" cy="22" r="3.5"/>
+    <circle cx="30" cy="15" r="3"/>
+    <circle cx="75" cy="40" r="3"/>
+  </g>
+  
+  <!-- AI 符号 -->
+  <g transform="translate(30, 22)">
+    <path d="M7 15 L15 7 L23 15 L15 23 Z" fill="url(#gradient2)" opacity="0.8"/>
+    <circle cx="15" cy="15" r="3" fill="white"/>
+  </g>
+  
+  <!-- HAG 文字 -->
+  <g font-family="Arial, sans-serif" font-weight="bold">
+    <!-- H -->
+    <text x="105" y="40" font-size="36" fill="url(#gradient1)">H</text>
+    <!-- A -->
+    <text x="135" y="40" font-size="36" fill="url(#gradient1)">A</text>
+    <!-- G -->
+    <text x="165" y="40" font-size="36" fill="url(#gradient1)">G</text>
+  </g>
+  
+  <!-- 副标题 -->
+  <text x="105" y="60" font-family="Arial, sans-serif" font-size="14" fill="#6B7280">Hybrid AI Graph</text>
+  
+  <!-- 装饰性元素 -->
+  <g opacity="0.3">
+    <circle cx="240" cy="22" r="2" fill="url(#gradient2)"/>
+    <circle cx="255" cy="30" r="1.5" fill="url(#gradient2)"/>
+    <circle cx="270" cy="37" r="2" fill="url(#gradient2)"/>
+    <circle cx="250" cy="50" r="1.5" fill="url(#gradient2)"/>
+    <line x1="240" y1="22" x2="255" y2="30" stroke="url(#gradient2)" stroke-width="1.5"/>
+    <line x1="255" y1="30" x2="270" y2="37" stroke="url(#gradient2)" stroke-width="1.5"/>
+    <line x1="255" y1="30" x2="250" y2="50" stroke="url(#gradient2)" stroke-width="1.5"/>
+  </g>
+</svg>

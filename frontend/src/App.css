@@ -1331,6 +1331,71 @@ body {
   color: var(--text-secondary);
 }
 
+/* 增强的进度显示样式 */
+.progress-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.progress-details {
+  margin-top: 4px;
+}
+
+.progress-details small {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.progress-warning {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--border-radius);
+  text-align: center;
+}
+
+.progress-warning small {
+  font-size: 11px;
+  color: #f59e0b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+/* 进度条颜色变化动画 */
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease, background 0.5s ease;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+}
+
+/* 不同阶段的进度条颜色 */
+.progress-fill[style*="#3b82f6"] {
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+.progress-fill[style*="#f59e0b"] {
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+}
+
+.progress-fill[style*="#10b981"] {
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
+.progress-fill[style*="#8b5cf6"] {
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+}
+
+.progress-fill[style*="#22c55e"] {
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+}
+
 /* 结果展示样式 */
 .results-grid {
   display: grid;
